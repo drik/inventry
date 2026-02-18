@@ -102,4 +102,19 @@ class Organization extends Model implements HasCurrentTenantLabel
     {
         return $this->hasMany(Assignment::class);
     }
+
+    public function inventorySessions(): HasMany
+    {
+        return $this->hasMany(InventorySession::class);
+    }
+
+    public function inventoryTasks(): HasMany
+    {
+        return $this->hasMany(InventoryTask::class);
+    }
+
+    public function inventoryItems(): HasMany
+    {
+        return $this->hasMany(InventoryItem::class);
+    }
 }

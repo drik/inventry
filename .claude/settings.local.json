@@ -14,7 +14,15 @@
     ],
     "additionalDirectories": [
       "\\home\\kodjo\\codes\\inventry\\app\\Filament\\App\\Resources",
-      "\\\\wsl.localhost\\Ubuntu\\home\\kodjo\\codes\\inventry\\app\\Filament\\App\\Resources"
+      "\\\\wsl.localhost\\Ubuntu\\home\\kodjo\\codes\\inventry\\app\\Filament\\App\\Resources",
+      "\\home\\kodjo\\codes\\inventry\\resources\\views\\filament\\infolists\\components",
+      "\\\\wsl.localhost\\Ubuntu\\home\\kodjo\\codes\\inventry\\resources\\views\\filament\\infolists\\components",
+      "\\home\\kodjo\\codes\\inventry\\app\\Enums",
+      "\\\\wsl.localhost\\Ubuntu\\home\\kodjo\\codes\\inventry\\app\\Enums",
+      "\\home\\kodjo\\codes\\inventry\\database\\migrations",
+      "\\\\wsl.localhost\\Ubuntu\\home\\kodjo\\codes\\inventry\\database\\migrations",
+      "\\home\\kodjo\\codes\\inventry\\app\\Models",
+      "\\\\wsl.localhost\\Ubuntu\\home\\kodjo\\codes\\inventry\\app\\Models"
     ]
   }
 }

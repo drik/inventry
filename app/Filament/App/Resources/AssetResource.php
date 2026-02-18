@@ -351,6 +351,13 @@ class AssetResource extends Resource
                                     ->money('USD')
                                     ->placeholder('—'),
                             ])->columns(2),
+
+                        Infolists\Components\Tabs\Tab::make('Images')
+                            ->schema([
+                                Infolists\Components\ViewEntry::make('images')
+                                    ->view('filament.infolists.components.image-carousel')
+                                    ->columnSpanFull(),
+                            ]),
                     ])->columnSpanFull(),
             ]);
     }

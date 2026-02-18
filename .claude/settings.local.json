@@ -11,6 +11,10 @@
       "Bash(wsl -d Ubuntu -e bash -c \"cd /home/kodjo/codes/inventry && php artisan migrate:fresh 2>&1\":*)",
       "Bash(wsl -d Ubuntu -e bash -c:*)",
       "Bash(test:*)"
+    ],
+    "additionalDirectories": [
+      "\\home\\kodjo\\codes\\inventry\\app\\Filament\\App\\Resources",
+      "\\\\wsl.localhost\\Ubuntu\\home\\kodjo\\codes\\inventry\\app\\Filament\\App\\Resources"
     ]
   }
 }

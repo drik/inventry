@@ -52,4 +52,54 @@ class Organization extends Model implements HasCurrentTenantLabel
     {
         return $this->hasMany(User::class);
     }
+
+    public function assetCategories(): HasMany
+    {
+        return $this->hasMany(AssetCategory::class);
+    }
+
+    public function manufacturers(): HasMany
+    {
+        return $this->hasMany(Manufacturer::class);
+    }
+
+    public function locations(): HasMany
+    {
+        return $this->hasMany(Location::class);
+    }
+
+    public function departments(): HasMany
+    {
+        return $this->hasMany(Department::class);
+    }
+
+    public function customFields(): HasMany
+    {
+        return $this->hasMany(CustomField::class);
+    }
+
+    public function assets(): HasMany
+    {
+        return $this->hasMany(Asset::class);
+    }
+
+    public function assetImages(): HasMany
+    {
+        return $this->hasMany(AssetImage::class);
+    }
+
+    public function assetTags(): HasMany
+    {
+        return $this->hasMany(AssetTag::class);
+    }
+
+    public function assetStatusHistories(): HasMany
+    {
+        return $this->hasMany(AssetStatusHistory::class);
+    }
+
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(Assignment::class);
+    }
 }

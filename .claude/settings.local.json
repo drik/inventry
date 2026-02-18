@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(composer create-project:*)",
+      "Bash(echo:*)",
+      "Bash(composer:*)",
+      "Bash(php:*)",
+      "Bash(wsl echo:*)",
+      "Bash(wsl bash:*)"
+    ]
+  }
+}

@@ -50,6 +50,11 @@ class AssetCategory extends Model
         return $this->hasMany(CustomField::class, 'category_id');
     }
 
+    public function identificationTags(): HasMany
+    {
+        return $this->hasMany(AssetTag::class, 'category_id')->orderBy('sort_order');
+    }
+
     public function assets(): HasMany
     {
         return $this->hasMany(Asset::class, 'category_id');

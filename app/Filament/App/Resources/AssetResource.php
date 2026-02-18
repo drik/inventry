@@ -8,6 +8,7 @@ use App\Filament\App\Resources\AssetResource\Actions;
 use App\Filament\App\Resources\AssetResource\Pages;
 use App\Filament\App\Resources\AssetResource\RelationManagers;
 use App\Models\Asset;
+use App\Models\AssetTag;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Infolists;
@@ -46,7 +47,29 @@ class AssetResource extends Resource
                                             ->relationship('category', 'name')
                                             ->required()
                                             ->searchable()
-                                            ->preload(),
+                                            ->preload()
+                                            ->live()
+                                            ->afterStateUpdated(function (?string $state, Forms\Set $set) {
+                                                if (! $state) {
+                                                    $set('tagValues', []);
+
+                                                    return;
+                                                }
+
+                                                $tags = AssetTag::where('category_id', $state)
+                                                    ->orderBy('sort_order')
+                                                    ->get();
+
+                                                $values = [];
+                                                foreach ($tags as $tag) {
+                                                    $values[] = [
+                                                        'asset_tag_id' => $tag->id,
+                                                        'value' => '',
+                                                    ];
+                                                }
+
+                                                $set('tagValues', $values);
+                                            }),
 
                                         Forms\Components\Select::make('location_id')
                                             ->relationship('location', 'name')
@@ -90,30 +113,80 @@ class AssetResource extends Resource
                                             ->visibleOn('edit'),
                                     ])->columns(2),
 
-                                Forms\Components\Section::make('Tags')
+                                Forms\Components\Section::make('Identification Tags')
                                     ->schema([
-                                        Forms\Components\Select::make('tags')
-                                            ->relationship('tags', 'name')
-                                            ->multiple()
-                                            ->searchable()
-                                            ->preload()
-                                            ->createOptionForm([
-                                                Forms\Components\TextInput::make('name')
-                                                    ->required()
+                                        Forms\Components\Repeater::make('tagValues')
+                                            ->relationship()
+                                            ->schema([
+                                                Forms\Components\Select::make('asset_tag_id')
+                                                    ->label('Tag')
+                                                    ->options(function (Forms\Get $get) {
+                                                        $categoryId = $get('../../category_id');
+                                                        if (! $categoryId) {
+                                                            return [];
+                                                        }
+
+                                                        return AssetTag::where('category_id', $categoryId)
+                                                            ->orderBy('sort_order')
+                                                            ->pluck('name', 'id');
+                                                    })
+                                                    ->disabled()
+                                                    ->dehydrated()
+                                                    ->required(),
+
+                                                Forms\Components\TextInput::make('value')
+                                                    ->required(fn (Forms\Get $get): bool => AssetTag::find($get('asset_tag_id'))?->is_required ?? false)
+                                                    ->helperText(fn (Forms\Get $get): ?string => AssetTag::find($get('asset_tag_id'))?->description)
                                                     ->maxLength(255),
+                                            ])
+                                            ->columns(2)
+                                            ->addable(false)
+                                            ->deletable(false)
+                                            ->reorderable(false)
+                                            ->defaultItems(0)
+                                            ->mutateRelationshipDataBeforeCreateUsing(function (array $data): ?array {
+                                                if (empty($data['value'])) {
+                                                    return null;
+                                                }
 
-                                                Forms\Components\Select::make('type')
-                                                    ->options([
-                                                        'barcode' => 'Barcode',
-                                                        'qr_code' => 'QR Code',
-                                                        'nfc' => 'NFC',
-                                                        'rfid' => 'RFID',
-                                                        'custom' => 'Custom',
-                                                    ]),
+                                                return $data;
+                                            })
+                                            ->mutateRelationshipDataBeforeSaveUsing(function (array $data): ?array {
+                                                if (empty($data['value'])) {
+                                                    return null;
+                                                }
 
-                                                Forms\Components\ColorPicker::make('color'),
-                                            ]),
-                                    ]),
+                                                return $data;
+                                            })
+                                            ->afterStateHydrated(function ($state, Forms\Get $get, Forms\Set $set) {
+                                                $categoryId = $get('category_id');
+                                                if (! $categoryId) {
+                                                    return;
+                                                }
+
+                                                $tags = AssetTag::where('category_id', $categoryId)
+                                                    ->orderBy('sort_order')
+                                                    ->get();
+
+                                                $existingTagIds = collect($state ?? [])
+                                                    ->pluck('asset_tag_id')
+                                                    ->filter()
+                                                    ->toArray();
+
+                                                $newState = $state ?? [];
+                                                foreach ($tags as $tag) {
+                                                    if (! in_array($tag->id, $existingTagIds)) {
+                                                        $newState[] = [
+                                                            'asset_tag_id' => $tag->id,
+                                                            'value' => '',
+                                                        ];
+                                                    }
+                                                }
+
+                                                $set('tagValues', $newState);
+                                            }),
+                                    ])
+                                    ->visible(fn (Forms\Get $get) => filled($get('category_id'))),
                             ]),
 
                         Forms\Components\Tabs\Tab::make('Financial')
@@ -326,6 +399,27 @@ class AssetResource extends Resource
                                             ->date()
                                             ->placeholder('—'),
                                     ])->columns(3),
+
+                                Infolists\Components\Section::make('Identification Tags')
+                                    ->schema(function ($record) {
+                                        if (! $record || $record->tagValues->isEmpty()) {
+                                            return [
+                                                Infolists\Components\TextEntry::make('no_tags')
+                                                    ->hiddenLabel()
+                                                    ->default('No identification tags.')
+                                                    ->color('gray'),
+                                            ];
+                                        }
+
+                                        return $record->tagValues->map(function ($tagValue) {
+                                            return Infolists\Components\TextEntry::make("tagValue_{$tagValue->id}")
+                                                ->label($tagValue->tag?->name ?? 'Tag')
+                                                ->default($tagValue->value)
+                                                ->copyable()
+                                                ->badge();
+                                        })->toArray();
+                                    })
+                                    ->columns(2),
                             ]),
 
                         Infolists\Components\Tabs\Tab::make('Financial')

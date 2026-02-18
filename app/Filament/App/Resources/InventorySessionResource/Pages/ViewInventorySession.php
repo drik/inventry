@@ -17,6 +17,13 @@ class ViewInventorySession extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            Actions\Action::make('execute_scan')
+                ->label('Execute Scan')
+                ->icon('heroicon-o-qr-code')
+                ->color('primary')
+                ->visible(fn () => $this->record->status === InventorySessionStatus::InProgress)
+                ->url(fn () => InventorySessionResource::getUrl('execute', ['record' => $this->record])),
+
             Actions\Action::make('start_session')
                 ->label('Start Session')
                 ->icon('heroicon-o-play')

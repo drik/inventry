@@ -176,6 +176,8 @@ class InventorySessionResource extends Resource
             'create' => Pages\CreateInventorySession::route('/create'),
             'view' => Pages\ViewInventorySession::route('/{record}'),
             'edit' => Pages\EditInventorySession::route('/{record}/edit'),
+            'execute' => Pages\ExecuteInventorySession::route('/{record}/execute'),
+            'execute-task' => Pages\ExecuteInventoryTask::route('/{record}/execute-task/{taskId}'),
         ];
     }
 }

@@ -10,7 +10,14 @@
       "Read(//home/kodjo/codes/inventry/app/**)",
       "Bash(wsl -d Ubuntu -e bash -c \"cd /home/kodjo/codes/inventry && php artisan migrate:fresh 2>&1\":*)",
       "Bash(wsl -d Ubuntu -e bash -c:*)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Read(//tmp/**)",
+      "Read(//wsl.localhost/Ubuntu/tmp/**)",
+      "Bash(python3:*)",
+      "Bash(wsl -d Ubuntu -- bash -c \"cd /home/kodjo/codes/inventry && php artisan route:list 2>&1 | grep execute\":*)",
+      "Bash(wsl -d Ubuntu -- bash -c \"cd /home/kodjo/codes/inventry && php artisan route:clear && php artisan route:list:*)",
+      "Bash(powershell.exe -Command \"netsh advfirewall firewall show rule name=''WSL Laravel'' 2>&1\")",
+      "Bash(wsl:*)"
     ],
     "additionalDirectories": [
       "\\home\\kodjo\\codes\\inventry\\app\\Filament\\App\\Resources",
@@ -22,7 +29,9 @@
       "\\home\\kodjo\\codes\\inventry\\database\\migrations",
       "\\\\wsl.localhost\\Ubuntu\\home\\kodjo\\codes\\inventry\\database\\migrations",
       "\\home\\kodjo\\codes\\inventry\\app\\Models",
-      "\\\\wsl.localhost\\Ubuntu\\home\\kodjo\\codes\\inventry\\app\\Models"
+      "\\\\wsl.localhost\\Ubuntu\\home\\kodjo\\codes\\inventry\\app\\Models",
+      "\\home\\kodjo\\codes\\inventry\\resources\\views\\filament\\app\\resources\\inventory-session-resource\\pages",
+      "\\\\wsl.localhost\\Ubuntu\\home\\kodjo\\codes\\inventry\\resources\\views\\filament\\app\\resources\\inventory-session-resource\\pages"
     ]
   }
 }

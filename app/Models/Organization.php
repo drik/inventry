@@ -93,6 +93,11 @@ class Organization extends Model implements HasCurrentTenantLabel
         return $this->hasMany(AssetTag::class);
     }
 
+    public function assetTagValues(): HasMany
+    {
+        return $this->hasMany(AssetTagValue::class);
+    }
+
     public function assetStatusHistories(): HasMany
     {
         return $this->hasMany(AssetStatusHistory::class);

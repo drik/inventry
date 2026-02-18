@@ -6,7 +6,11 @@
       "Bash(composer:*)",
       "Bash(php:*)",
       "Bash(wsl echo:*)",
-      "Bash(wsl bash:*)"
+      "Bash(wsl bash:*)",
+      "Read(//home/kodjo/codes/inventry/app/**)",
+      "Bash(wsl -d Ubuntu -e bash -c \"cd /home/kodjo/codes/inventry && php artisan migrate:fresh 2>&1\":*)",
+      "Bash(wsl -d Ubuntu -e bash -c:*)",
+      "Bash(test:*)"
     ]
   }
 }

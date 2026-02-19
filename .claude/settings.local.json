@@ -31,7 +31,9 @@
       "\\home\\kodjo\\codes\\inventry\\app\\Models",
       "\\\\wsl.localhost\\Ubuntu\\home\\kodjo\\codes\\inventry\\app\\Models",
       "\\home\\kodjo\\codes\\inventry\\resources\\views\\filament\\app\\resources\\inventory-session-resource\\pages",
-      "\\\\wsl.localhost\\Ubuntu\\home\\kodjo\\codes\\inventry\\resources\\views\\filament\\app\\resources\\inventory-session-resource\\pages"
+      "\\\\wsl.localhost\\Ubuntu\\home\\kodjo\\codes\\inventry\\resources\\views\\filament\\app\\resources\\inventory-session-resource\\pages",
+      "\\home\\kodjo\\codes\\inventry\\database\\seeders",
+      "\\\\wsl.localhost\\Ubuntu\\home\\kodjo\\codes\\inventry\\database\\seeders"
     ]
   }
 }

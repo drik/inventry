@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\EncodingMode;
 use App\Models\Concerns\BelongsToOrganization;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -19,6 +20,7 @@ class AssetTag extends Model
         'name',
         'description',
         'is_required',
+        'encoding_mode',
         'sort_order',
     ];
 
@@ -26,6 +28,7 @@ class AssetTag extends Model
     {
         return [
             'is_required' => 'boolean',
+            'encoding_mode' => EncodingMode::class,
         ];
     }
 

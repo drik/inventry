@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\EncodingMode;
 use App\Models\Concerns\BelongsToOrganization;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,7 +18,15 @@ class AssetTagValue extends Model
         'asset_id',
         'asset_tag_id',
         'value',
+        'encoding_mode',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'encoding_mode' => EncodingMode::class,
+        ];
+    }
 
     public function asset(): BelongsTo
     {

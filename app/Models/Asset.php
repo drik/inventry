@@ -27,6 +27,7 @@ class Asset extends Model
         'model_id',
         'location_id',
         'department_id',
+        'manufacturer_id',
         'serial_number',
         'sku',
         'status',
@@ -114,6 +115,11 @@ class Asset extends Model
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
+    }
+
+    public function manufacturer(): BelongsTo
+    {
+        return $this->belongsTo(Manufacturer::class);
     }
 
     public function images(): HasMany

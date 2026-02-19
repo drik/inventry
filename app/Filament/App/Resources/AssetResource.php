@@ -4,6 +4,7 @@ namespace App\Filament\App\Resources;
 
 use App\Enums\AssetStatus;
 use App\Enums\DepreciationMethod;
+use App\Enums\EncodingMode;
 use App\Filament\App\Resources\AssetResource\Actions;
 use App\Filament\App\Resources\AssetResource\Pages;
 use App\Filament\App\Resources\AssetResource\RelationManagers;
@@ -65,6 +66,7 @@ class AssetResource extends Resource
                                                     $values[] = [
                                                         'asset_tag_id' => $tag->id,
                                                         'value' => '',
+                                                        'encoding_mode' => $tag->encoding_mode?->value,
                                                     ];
                                                 }
 
@@ -79,6 +81,12 @@ class AssetResource extends Resource
 
                                         Forms\Components\Select::make('department_id')
                                             ->relationship('department', 'name')
+                                            ->searchable()
+                                            ->preload()
+                                            ->nullable(),
+
+                                        Forms\Components\Select::make('manufacturer_id')
+                                            ->relationship('manufacturer', 'name')
                                             ->searchable()
                                             ->preload()
                                             ->nullable(),
@@ -137,9 +145,18 @@ class AssetResource extends Resource
                                                 Forms\Components\TextInput::make('value')
                                                     ->required(fn (Forms\Get $get): bool => AssetTag::find($get('asset_tag_id'))?->is_required ?? false)
                                                     ->helperText(fn (Forms\Get $get): ?string => AssetTag::find($get('asset_tag_id'))?->description)
-                                                    ->maxLength(255),
+                                                    ->maxLength(255)
+                                                    ->live(debounce: 500),
+
+                                                Forms\Components\Select::make('encoding_mode')
+                                                    ->label('Encoding')
+                                                    ->options(EncodingMode::class)
+                                                    ->default(fn (Forms\Get $get) => AssetTag::find($get('asset_tag_id'))?->encoding_mode)
+                                                    ->required(fn (Forms\Get $get): bool => filled($get('value')))
+                                                    ->nullable()
+                                                    ->placeholder('None'),
                                             ])
-                                            ->columns(2)
+                                            ->columns(3)
                                             ->addable(false)
                                             ->deletable(false)
                                             ->reorderable(false)
@@ -167,6 +184,7 @@ class AssetResource extends Resource
                                                 $tags = AssetTag::where('category_id', $categoryId)
                                                     ->orderBy('sort_order')
                                                     ->get();
+                                                $tagsById = $tags->keyBy('id');
 
                                                 $existingTagIds = collect($state ?? [])
                                                     ->pluck('asset_tag_id')
@@ -174,11 +192,22 @@ class AssetResource extends Resource
                                                     ->toArray();
 
                                                 $newState = $state ?? [];
+
+                                                // Fill encoding_mode from tag default for existing entries without one
+                                                foreach ($newState as &$entry) {
+                                                    if (empty($entry['encoding_mode']) && isset($tagsById[$entry['asset_tag_id']])) {
+                                                        $entry['encoding_mode'] = $tagsById[$entry['asset_tag_id']]->encoding_mode?->value;
+                                                    }
+                                                }
+                                                unset($entry);
+
+                                                // Add missing tags
                                                 foreach ($tags as $tag) {
                                                     if (! in_array($tag->id, $existingTagIds)) {
                                                         $newState[] = [
                                                             'asset_tag_id' => $tag->id,
                                                             'value' => '',
+                                                            'encoding_mode' => $tag->encoding_mode?->value,
                                                         ];
                                                     }
                                                 }
@@ -257,6 +286,13 @@ class AssetResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\ImageColumn::make('primaryImage.file_path')
+                    ->label('Image')
+                    //->square()
+                    //->size(40)
+                    ->width(60)
+                    ->defaultImageUrl(fn ($record) => null),
+
                 Tables\Columns\TextColumn::make('asset_code')
                     ->searchable()
                     ->sortable()
@@ -270,6 +306,11 @@ class AssetResource extends Resource
                 Tables\Columns\TextColumn::make('category.name')
                     ->sortable()
                     ->badge(),
+
+                Tables\Columns\TextColumn::make('manufacturer.name')
+                    ->sortable()
+                    ->placeholder('—')
+                    ->toggleable(),
 
                 Tables\Columns\TextColumn::make('location.name')
                     ->sortable(),
@@ -334,12 +375,14 @@ class AssetResource extends Resource
                 Tables\Filters\TrashedFilter::make(),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
-                Actions\CheckOutAction::make(),
-                Actions\CheckInAction::make(),
-                Tables\Actions\DeleteAction::make(),
-                Tables\Actions\RestoreAction::make(),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\ViewAction::make(),
+                    Tables\Actions\EditAction::make(),
+                    Actions\CheckOutAction::make(),
+                    Actions\CheckInAction::make(),
+                    Tables\Actions\DeleteAction::make(),
+                    Tables\Actions\RestoreAction::make(),
+                ]),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -359,29 +402,49 @@ class AssetResource extends Resource
                             ->schema([
                                 Infolists\Components\Section::make('Details')
                                     ->schema([
-                                        Infolists\Components\TextEntry::make('asset_code')
-                                            ->badge()
-                                            ->copyable(),
+                                        Infolists\Components\Group::make([
+                                            Infolists\Components\TextEntry::make('asset_code')
+                                                ->badge()
+                                                ->copyable(),
 
-                                        Infolists\Components\TextEntry::make('name'),
+                                            Infolists\Components\ImageEntry::make('primaryImage.file_path')
+                                                ->label('Image')
+                                                ->height(200),
+                                        ])->columnSpan(1),
 
-                                        Infolists\Components\TextEntry::make('category.name'),
+                                        Infolists\Components\Group::make([
+                                            Infolists\Components\TextEntry::make('name'),
 
-                                        Infolists\Components\TextEntry::make('status')
-                                            ->badge(),
+                                            Infolists\Components\TextEntry::make('category.name'),
 
-                                        Infolists\Components\TextEntry::make('location.name'),
+                                            Infolists\Components\TextEntry::make('manufacturer.name')
+                                                ->placeholder('—'),
 
-                                        Infolists\Components\TextEntry::make('department.name')
-                                            ->placeholder('—'),
+                                            Infolists\Components\TextEntry::make('status')
+                                                ->badge(),
 
-                                        Infolists\Components\TextEntry::make('serial_number')
-                                            ->copyable()
-                                            ->placeholder('—'),
+                                            Infolists\Components\TextEntry::make('location.name'),
 
-                                        Infolists\Components\TextEntry::make('barcode')
-                                            ->copyable(),
-                                    ])->columns(2),
+                                            Infolists\Components\TextEntry::make('department.name')
+                                                ->placeholder('—'),
+
+                                            Infolists\Components\TextEntry::make('serial_number')
+                                                ->copyable()
+                                                ->placeholder('—'),
+
+                                            Infolists\Components\TextEntry::make('barcode')
+                                                ->copyable(),
+                                        ])->columns(2)->columnSpan(2),
+                                    ])->columns(3),
+
+                                
+
+                                Infolists\Components\Section::make('Identification Tags')
+                                    ->schema([
+                                        Infolists\Components\ViewEntry::make('tagValues')
+                                            ->view('filament.infolists.components.tag-values')
+                                            ->columns(4),
+                                    ]),
 
                                 Infolists\Components\Section::make('Current Assignment')
                                     ->schema([
@@ -400,27 +463,8 @@ class AssetResource extends Resource
                                             ->placeholder('—'),
                                     ])->columns(3),
 
-                                Infolists\Components\Section::make('Identification Tags')
-                                    ->schema(function ($record) {
-                                        if (! $record || $record->tagValues->isEmpty()) {
-                                            return [
-                                                Infolists\Components\TextEntry::make('no_tags')
-                                                    ->hiddenLabel()
-                                                    ->default('No identification tags.')
-                                                    ->color('gray'),
-                                            ];
-                                        }
-
-                                        return $record->tagValues->map(function ($tagValue) {
-                                            return Infolists\Components\TextEntry::make("tagValue_{$tagValue->id}")
-                                                ->label($tagValue->tag?->name ?? 'Tag')
-                                                ->default($tagValue->value)
-                                                ->copyable()
-                                                ->badge();
-                                        })->toArray();
-                                    })
-                                    ->columns(2),
                             ]),
+
 
                         Infolists\Components\Tabs\Tab::make('Financial')
                             ->schema([
@@ -451,6 +495,15 @@ class AssetResource extends Resource
                                 Infolists\Components\ViewEntry::make('images')
                                     ->view('filament.infolists.components.image-carousel')
                                     ->columnSpanFull(),
+                            ]),
+
+                        Infolists\Components\Tabs\Tab::make('Notes')
+                            ->schema([
+                                Infolists\Components\TextEntry::make('notes')
+                                    ->hiddenLabel()
+                                    ->html()
+                                    ->columnSpanFull()
+                                    ->placeholder('No notes.'),
                             ]),
                     ])->columnSpanFull(),
             ]);

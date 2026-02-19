@@ -3,6 +3,7 @@
 namespace App\Filament\App\Resources;
 
 use App\Enums\DepreciationMethod;
+use App\Enums\EncodingMode;
 use App\Filament\App\Resources\AssetCategoryResource\Pages;
 use App\Filament\App\Resources\AssetCategoryResource\RelationManagers;
 use App\Models\AssetCategory;
@@ -77,6 +78,12 @@ class AssetCategoryResource extends Resource
 
                                 Forms\Components\Toggle::make('is_required')
                                     ->label('Required'),
+
+                                Forms\Components\Select::make('encoding_mode')
+                                    ->label('Encoding Mode')
+                                    ->options(EncodingMode::class)
+                                    ->nullable()
+                                    ->placeholder('None'),
 
                                 Forms\Components\TextInput::make('sort_order')
                                     ->numeric()

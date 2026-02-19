@@ -9,6 +9,8 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 class ManufacturerResource extends Resource
 {
@@ -19,6 +21,13 @@ class ManufacturerResource extends Resource
     protected static ?string $navigationGroup = 'Asset Management';
 
     protected static ?int $navigationSort = 4;
+
+    public static function scopeEloquentQueryToTenant(Builder $query, ?Model $tenant): Builder
+    {
+        // Tenant scoping is handled by the model's global scope,
+        // which includes default manufacturers (organization_id IS NULL).
+        return $query;
+    }
 
     public static function form(Form $form): Form
     {
@@ -54,7 +63,8 @@ class ManufacturerResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->description(fn ($record) => $record->isDefault() ? 'Default' : null),
 
                 Tables\Columns\TextColumn::make('website')
                     ->url(fn ($record) => $record->website, shouldOpenInNewTab: true)
@@ -66,14 +76,17 @@ class ManufacturerResource extends Resource
             ->filters([])
             ->actions([
                 Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\EditAction::make()
+                    ->visible(fn ($record) => ! $record->isDefault()),
+                Tables\Actions\DeleteAction::make()
+                    ->visible(fn ($record) => ! $record->isDefault()),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->checkIfRecordIsSelectableUsing(fn ($record) => ! $record->isDefault());
     }
 
     public static function getPages(): array

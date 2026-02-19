@@ -9,6 +9,7 @@ use App\Models\Asset;
 use App\Models\InventoryItem;
 use App\Models\InventorySession;
 use App\Models\InventoryTask;
+use App\Notifications\InventoryTaskCompleted;
 use Filament\Facades\Filament;
 use Filament\Resources\Pages\Page;
 use Illuminate\Support\Facades\Auth;
@@ -218,6 +219,12 @@ class ExecuteInventoryTask extends Page
             'status' => 'completed',
             'completed_at' => now(),
         ]);
+
+        // Notify session creator
+        $creator = $this->task->session->creator;
+        if ($creator && $creator->id !== Auth::id()) {
+            $creator->notify(new InventoryTaskCompleted($this->task));
+        }
 
         // Also refresh session counters
         $this->refreshSessionCounters();

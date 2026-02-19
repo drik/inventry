@@ -6,6 +6,7 @@ use App\Enums\InventoryItemStatus;
 use App\Enums\InventorySessionStatus;
 use App\Filament\App\Resources\InventorySessionResource;
 use App\Models\Asset;
+use App\Notifications\InventoryTaskAssigned;
 use Filament\Actions;
 use Filament\Facades\Filament;
 use Filament\Resources\Pages\ViewRecord;
@@ -62,6 +63,14 @@ class ViewInventorySession extends ViewRecord
                         'started_at' => now(),
                         'total_expected' => $assets->count(),
                     ]);
+
+                    // Notify assigned users (except session creator)
+                    $session->load('tasks.assignee', 'tasks.location');
+                    $session->tasks->each(function ($task) use ($session) {
+                        if ($task->assigned_to !== $session->created_by && $task->assignee) {
+                            $task->assignee->notify(new InventoryTaskAssigned($task));
+                        }
+                    });
                 })
                 ->successNotificationTitle('Session started'),
 

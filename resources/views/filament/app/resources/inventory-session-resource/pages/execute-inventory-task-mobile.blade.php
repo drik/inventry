@@ -636,10 +636,12 @@
             color: #fff;
             font-size: 14px;
             font-weight: 600;
+            margin-top: -32px;
         }
         .nfc-mode-sub {
             color: #64748b;
             font-size: 13px;
+            margin-top: -20px;
         }
         @keyframes nfc-ring-expand {
             0% { transform: scale(1); opacity: 0.6; border-color: rgba(59, 130, 246, 0.4); }

@@ -1,6 +1,17 @@
 <x-filament-panels::page>
     @push('scripts')
         <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+        <script>
+            // Auto-detect mobile and redirect to mobile scanner
+            (function() {
+                var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+                    || (window.innerWidth <= 768 && 'ontouchstart' in window);
+                if (isMobile) {
+                    var mobileUrl = window.location.href.replace('/execute-task/', '/execute-task-mobile/');
+                    window.location.replace(mobileUrl);
+                }
+            })();
+        </script>
     @endpush
 
     {{-- HEADER: Task info + Progress --}}
@@ -293,6 +304,15 @@
                     Complete Task
                 </button>
             @endif
+
+            {{-- Mode Mobile --}}
+            <a
+                href="{{ \App\Filament\App\Resources\InventorySessionResource::getUrl('execute-task-mobile', ['record' => $this->record->id, 'taskId' => $task->id]) }}"
+                class="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 font-medium text-white transition hover:bg-blue-700"
+            >
+                <x-heroicon-o-device-phone-mobile class="h-5 w-5" />
+                Mode Mobile
+            </a>
 
             {{-- Back to My Tasks --}}
             <a

@@ -178,6 +178,7 @@ class InventorySessionResource extends Resource
             'edit' => Pages\EditInventorySession::route('/{record}/edit'),
             'execute' => Pages\ExecuteInventorySession::route('/{record}/execute'),
             'execute-task' => Pages\ExecuteInventoryTask::route('/{record}/execute-task/{taskId}'),
+            'execute-task-mobile' => Pages\ExecuteInventoryTaskMobile::route('/{record}/execute-task-mobile/{taskId}'),
         ];
     }
 }

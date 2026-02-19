@@ -147,7 +147,21 @@ class AssetResource extends Resource
                                                     ->required(fn (Forms\Get $get): bool => AssetTag::find($get('asset_tag_id'))?->is_required ?? false)
                                                     ->helperText(fn (Forms\Get $get): ?string => AssetTag::find($get('asset_tag_id'))?->description)
                                                     ->maxLength(255)
-                                                    ->live(debounce: 500),
+                                                    ->live(debounce: 500)
+                                                    ->suffixAction(
+                                                        Forms\Components\Actions\Action::make('scan')
+                                                            ->icon('heroicon-o-qr-code')
+                                                            ->color('gray')
+                                                            ->tooltip('Scan')
+                                                            ->alpineClickHandler(function ($component): string {
+                                                                $valuePath = $component->getStatePath();
+                                                                $encodingPath = str_replace('.value', '.encoding_mode', $valuePath);
+
+                                                                return "window.dispatchEvent(new CustomEvent('open-tag-scanner', "
+                                                                    . "{ detail: { encodingMode: \$wire.get('{$encodingPath}'), "
+                                                                    . "statePath: '{$valuePath}' } }))";
+                                                            }),
+                                                    ),
 
                                                 Forms\Components\Select::make('encoding_mode')
                                                     ->label('Encoding')
@@ -215,6 +229,11 @@ class AssetResource extends Resource
 
                                                 $set('tagValues', $newState);
                                             }),
+
+                                        Forms\Components\ViewField::make('tag_scanner_modal')
+                                            ->view('filament.forms.components.tag-scanner-modal')
+                                            ->dehydrated(false)
+                                            ->hiddenLabel(),
                                     ])
                                     ->visible(fn (Forms\Get $get) => filled($get('category_id'))),
                             ]),

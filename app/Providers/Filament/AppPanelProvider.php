@@ -31,6 +31,9 @@ class AppPanelProvider extends PanelProvider
             ->id('app')
             ->path('app')
             ->login()
+            ->brandLogo(asset('images/logo.png'))
+            ->darkModeBrandLogo(asset('images/logo_white.png'))
+            ->brandLogoHeight('2rem')
             ->tenant(Organization::class, slugAttribute: 'slug')
             ->tenantRegistration(RegisterOrganization::class)
             ->tenantProfile(EditOrganizationProfile::class)
@@ -44,8 +47,12 @@ class AppPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/App/Widgets'), for: 'App\\Filament\\App\\Widgets')
             ->widgets([
-                Widgets\AccountWidget::class,
-                Widgets\FilamentInfoWidget::class,
+                \App\Filament\Widgets\StatsOverview::class,
+                \App\Filament\Widgets\AssetsByStatusChart::class,
+                \App\Filament\Widgets\AssetsByCategoryChart::class,
+                \App\Filament\Widgets\AssetsByLocationChart::class,
+                \App\Filament\Widgets\InventorySessionsChart::class,
+                \App\Filament\Widgets\LatestActivityWidget::class,
             ])
             ->plugin(
                 ThemesPlugin::make()

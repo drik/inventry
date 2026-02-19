@@ -37,6 +37,7 @@ class AssetResource extends Resource
                 Forms\Components\Tabs::make('Asset')
                     ->tabs([
                         Forms\Components\Tabs\Tab::make('General')
+                            ->icon('heroicon-o-information-circle')
                             ->schema([
                                 Forms\Components\Section::make('Basic Information')
                                     ->schema([
@@ -219,6 +220,7 @@ class AssetResource extends Resource
                             ]),
 
                         Forms\Components\Tabs\Tab::make('Financial')
+                            ->icon('heroicon-o-currency-dollar')
                             ->schema([
                                 Forms\Components\Section::make('Purchase')
                                     ->schema([
@@ -250,6 +252,8 @@ class AssetResource extends Resource
                             ]),
 
                         Forms\Components\Tabs\Tab::make('Images')
+                            ->icon('heroicon-o-photo')
+                            ->badge(fn (?Asset $record) => $record?->images()->count())
                             ->schema([
                                 Forms\Components\Repeater::make('images')
                                     ->relationship()
@@ -273,7 +277,28 @@ class AssetResource extends Resource
                                     ->itemLabel(fn (array $state): ?string => $state['caption'] ?? 'Image'),
                             ]),
 
+                        Forms\Components\Tabs\Tab::make('Assignments')
+                            ->icon('heroicon-o-user-group')
+                            ->badge(fn (?Asset $record) => $record?->assignments()->count())
+                            ->schema([
+                                Forms\Components\ViewField::make('assignments_display')
+                                    ->view('filament.forms.components.assignments-list')
+                                    ->columnSpanFull(),
+                            ])
+                            ->visibleOn('edit'),
+
+                        Forms\Components\Tabs\Tab::make('Status History')
+                            ->icon('heroicon-o-clock')
+                            ->badge(fn (?Asset $record) => $record?->statusHistory()->count())
+                            ->schema([
+                                Forms\Components\ViewField::make('status_history_display')
+                                    ->view('filament.forms.components.status-history-list')
+                                    ->columnSpanFull(),
+                            ])
+                            ->visibleOn('edit'),
+
                         Forms\Components\Tabs\Tab::make('Notes')
+                            ->icon('heroicon-o-document-text')
                             ->schema([
                                 Forms\Components\RichEditor::make('notes')
                                     ->columnSpanFull(),
@@ -399,42 +424,29 @@ class AssetResource extends Resource
                 Infolists\Components\Tabs::make('Asset')
                     ->tabs([
                         Infolists\Components\Tabs\Tab::make('Overview')
+                            ->icon('heroicon-o-information-circle')
                             ->schema([
                                 Infolists\Components\Section::make('Details')
                                     ->schema([
                                         Infolists\Components\Group::make([
-                                            Infolists\Components\TextEntry::make('asset_code')
-                                                ->badge()
-                                                ->copyable(),
+                                            Infolists\Components\Grid::make(2)
+                                                ->schema([
+                                                    Infolists\Components\TextEntry::make('asset_code')
+                                                        ->badge()
+                                                        ->copyable(),
+                                                    Infolists\Components\TextEntry::make('status')
+                                                        ->badge(),
+                                                ]),
 
                                             Infolists\Components\ImageEntry::make('primaryImage.file_path')
-                                                ->label('Image')
+                                                ->label('')
                                                 ->height(200),
                                         ])->columnSpan(1),
 
-                                        Infolists\Components\Group::make([
-                                            Infolists\Components\TextEntry::make('name'),
-
-                                            Infolists\Components\TextEntry::make('category.name'),
-
-                                            Infolists\Components\TextEntry::make('manufacturer.name')
-                                                ->placeholder('—'),
-
-                                            Infolists\Components\TextEntry::make('status')
-                                                ->badge(),
-
-                                            Infolists\Components\TextEntry::make('location.name'),
-
-                                            Infolists\Components\TextEntry::make('department.name')
-                                                ->placeholder('—'),
-
-                                            Infolists\Components\TextEntry::make('serial_number')
-                                                ->copyable()
-                                                ->placeholder('—'),
-
-                                            Infolists\Components\TextEntry::make('barcode')
-                                                ->copyable(),
-                                        ])->columns(2)->columnSpan(2),
+                                        Infolists\Components\ViewEntry::make('editable_details')
+                                            ->hiddenLabel()
+                                            ->view('filament.infolists.components.inline-edit-overview')
+                                            ->columnSpan(2),
                                     ])->columns(3),
 
                                 
@@ -442,6 +454,7 @@ class AssetResource extends Resource
                                 Infolists\Components\Section::make('Identification Tags')
                                     ->schema([
                                         Infolists\Components\ViewEntry::make('tagValues')
+                                            ->hiddenLabel()
                                             ->view('filament.infolists.components.tag-values')
                                             ->columns(4),
                                     ]),
@@ -467,37 +480,95 @@ class AssetResource extends Resource
 
 
                         Infolists\Components\Tabs\Tab::make('Financial')
+                            ->icon('heroicon-o-currency-dollar')
                             ->schema([
-                                Infolists\Components\TextEntry::make('purchase_cost')
-                                    ->money('USD'),
-
-                                Infolists\Components\TextEntry::make('purchase_date')
-                                    ->date(),
-
-                                Infolists\Components\TextEntry::make('warranty_expiry')
-                                    ->date()
-                                    ->color(fn ($record) => $record->warranty_expiry?->isPast() ? 'danger' : null),
-
-                                Infolists\Components\TextEntry::make('depreciation_method')
-                                    ->placeholder('—'),
-
-                                Infolists\Components\TextEntry::make('useful_life_months')
-                                    ->suffix(' months')
-                                    ->placeholder('—'),
-
-                                Infolists\Components\TextEntry::make('salvage_value')
-                                    ->money('USD')
-                                    ->placeholder('—'),
-                            ])->columns(2),
+                                Infolists\Components\ViewEntry::make('financial_fields')
+                                    ->hiddenLabel()
+                                    ->view('filament.infolists.components.inline-edit-financial')
+                                    ->columnSpanFull(),
+                            ]),
 
                         Infolists\Components\Tabs\Tab::make('Images')
+                            ->icon('heroicon-o-photo')
+                            ->badge(fn ($record) => $record->images()->count())
                             ->schema([
                                 Infolists\Components\ViewEntry::make('images')
                                     ->view('filament.infolists.components.image-carousel')
                                     ->columnSpanFull(),
                             ]),
 
+                        Infolists\Components\Tabs\Tab::make('Assignments')
+                            ->icon('heroicon-o-user-group')
+                            ->badge(fn ($record) => $record->assignments()->count())
+                            ->schema([
+                                Infolists\Components\RepeatableEntry::make('assignments')
+                                    ->hiddenLabel()
+                                    ->schema([
+                                        Infolists\Components\TextEntry::make('assignee.name')
+                                            ->label('Assignee'),
+
+                                        Infolists\Components\TextEntry::make('assignee_type')
+                                            ->label('Type')
+                                            ->badge()
+                                            ->formatStateUsing(fn (string $state) => class_basename($state))
+                                            ->color(fn (string $state) => match ($state) {
+                                                'App\\Models\\User' => 'info',
+                                                'App\\Models\\Department' => 'warning',
+                                                'App\\Models\\Location' => 'success',
+                                                default => 'gray',
+                                            }),
+
+                                        Infolists\Components\TextEntry::make('assigned_at')
+                                            ->dateTime(),
+
+                                        Infolists\Components\TextEntry::make('expected_return_at')
+                                            ->date()
+                                            ->placeholder('—')
+                                            ->color(fn ($record) => $record->expected_return_at?->isPast() && ! $record->returned_at ? 'danger' : null),
+
+                                        Infolists\Components\TextEntry::make('returned_at')
+                                            ->dateTime()
+                                            ->placeholder('Active')
+                                            ->badge()
+                                            ->color(fn ($state) => $state ? 'success' : 'warning'),
+
+                                        Infolists\Components\TextEntry::make('assignedBy.name')
+                                            ->label('Assigned By'),
+                                    ])
+                                    ->columns(6)
+                                    ->columnSpanFull(),
+                            ]),
+
+                        Infolists\Components\Tabs\Tab::make('Status History')
+                            ->icon('heroicon-o-clock')
+                            ->badge(fn ($record) => $record->statusHistory()->count())
+                            ->schema([
+                                Infolists\Components\RepeatableEntry::make('statusHistory')
+                                    ->hiddenLabel()
+                                    ->schema([
+                                        Infolists\Components\TextEntry::make('created_at')
+                                            ->label('Date')
+                                            ->dateTime(),
+
+                                        Infolists\Components\TextEntry::make('from_status')
+                                            ->badge()
+                                            ->placeholder('—'),
+
+                                        Infolists\Components\TextEntry::make('to_status')
+                                            ->badge(),
+
+                                        Infolists\Components\TextEntry::make('user.name')
+                                            ->label('Changed by'),
+
+                                        Infolists\Components\TextEntry::make('reason')
+                                            ->placeholder('—'),
+                                    ])
+                                    ->columns(5)
+                                    ->columnSpanFull(),
+                            ]),
+
                         Infolists\Components\Tabs\Tab::make('Notes')
+                            ->icon('heroicon-o-document-text')
                             ->schema([
                                 Infolists\Components\TextEntry::make('notes')
                                     ->hiddenLabel()
@@ -511,11 +582,7 @@ class AssetResource extends Resource
 
     public static function getRelations(): array
     {
-        return [
-            RelationManagers\AssignmentsRelationManager::class,
-            RelationManagers\ImagesRelationManager::class,
-            RelationManagers\StatusHistoryRelationManager::class,
-        ];
+        return [];
     }
 
     public static function getPages(): array

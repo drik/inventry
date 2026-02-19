@@ -15,12 +15,28 @@
         <div class="scanner-section">
             <div id="qr-reader-mobile" class="scanner-video-container" wire:ignore></div>
 
-            {{-- Viewfinder --}}
-            <div class="viewfinder">
+            {{-- Viewfinder (camera mode) --}}
+            <div class="viewfinder" x-show="!nfcActive" x-transition.opacity.duration.200ms>
                 <div class="viewfinder-corner viewfinder-tl"></div>
                 <div class="viewfinder-corner viewfinder-tr"></div>
                 <div class="viewfinder-corner viewfinder-bl"></div>
                 <div class="viewfinder-corner viewfinder-br"></div>
+            </div>
+
+            {{-- NFC mode overlay (replaces camera view) --}}
+            <div class="nfc-mode-overlay" x-show="nfcActive" x-transition.opacity.duration.300ms x-cloak>
+                <div class="nfc-scan-zone">
+                    <div class="nfc-ring nfc-ring-1"></div>
+                    <div class="nfc-ring nfc-ring-2"></div>
+                    <div class="nfc-ring nfc-ring-3"></div>
+                    <div class="nfc-center-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 0 1 7.424-7.424m-1.414 1.414a3 3 0 0 0-4.243 0m0 4.243a3 3 0 0 0 4.243 0m1.414 1.414a5.25 5.25 0 0 1-7.424 0M5.106 18.894c-3.808-3.808-3.808-9.98 0-13.788m13.788 0c3.808 3.808 3.808 9.98 0 13.788"/>
+                        </svg>
+                    </div>
+                </div>
+                <div class="nfc-mode-text">Approchez-vous d'un tag NFC</div>
+                <div class="nfc-mode-sub">Placez le dos du t&eacute;l&eacute;phone contre le tag</div>
             </div>
 
             {{-- Scan flash --}}
@@ -36,7 +52,25 @@
                     <div class="scanner-topbar-name">{{ $task->location?->name ?? $this->record->name }}</div>
                     <div class="scanner-topbar-sub">{{ $this->record->name }}</div>
                 </div>
-                <div style="width:40px;"></div>
+                <button
+                    x-show="nfcSupported"
+                    x-on:click="toggleNfc()"
+                    class="nfc-toggle"
+                    :class="{ 'active': nfcActive }"
+                    type="button"
+                    x-cloak
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 0 1 7.424-7.424m-1.414 1.414a3 3 0 0 0-4.243 0m0 4.243a3 3 0 0 0 4.243 0m1.414 1.414a5.25 5.25 0 0 1-7.424 0M5.106 18.894c-3.808-3.808-3.808-9.98 0-13.788m13.788 0c3.808 3.808 3.808 9.98 0 13.788"/>
+                    </svg>
+                </button>
+                <div x-show="!nfcSupported" style="width:40px;" x-cloak></div>
+            </div>
+
+            {{-- NFC active indicator --}}
+            <div x-show="nfcActive" x-cloak class="nfc-indicator">
+                <span class="nfc-indicator-dot"></span>
+                NFC
             </div>
 
             {{-- Feedback + progress (above bottom sheet) --}}
@@ -500,6 +534,126 @@
         .action-btn:active { opacity: 0.8; }
         .action-btn-success { background: #22c55e; color: #000; }
         .action-btn-warning { background: #eab308; color: #000; }
+
+        /* NFC toggle button */
+        .nfc-toggle {
+            color: #fff;
+            padding: 8px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            width: 40px;
+            height: 40px;
+        }
+        .nfc-toggle:active { opacity: 0.7; }
+        .nfc-toggle.active {
+            background: #3b82f6;
+            animation: nfc-btn-pulse 2s ease-in-out infinite;
+        }
+
+        /* NFC indicator badge */
+        .nfc-indicator {
+            position: absolute;
+            top: calc(60px + env(safe-area-inset-top));
+            right: 16px;
+            z-index: 10;
+            background: rgba(59, 130, 246, 0.85);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            letter-spacing: 0.5px;
+        }
+        .nfc-indicator-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #86efac;
+            animation: nfc-dot-blink 1.5s ease-in-out infinite;
+        }
+
+        /* NFC mode overlay */
+        .nfc-mode-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 4;
+            background: radial-gradient(ellipse at center, #1e293b 0%, #0f172a 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            padding-bottom: 45%;
+        }
+        .nfc-scan-zone {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .nfc-ring {
+            position: absolute;
+            border-radius: 50%;
+            border: 2px solid rgba(59, 130, 246, 0.25);
+        }
+        .nfc-ring-1 {
+            width: 100px; height: 100px;
+            animation: nfc-ring-expand 2.5s ease-out infinite;
+        }
+        .nfc-ring-2 {
+            width: 100px; height: 100px;
+            animation: nfc-ring-expand 2.5s ease-out 0.8s infinite;
+        }
+        .nfc-ring-3 {
+            width: 100px; height: 100px;
+            animation: nfc-ring-expand 2.5s ease-out 1.6s infinite;
+        }
+        .nfc-center-icon {
+            position: relative;
+            z-index: 2;
+            color: #3b82f6;
+            background: rgba(59, 130, 246, 0.1);
+            width: 88px;
+            height: 88px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid rgba(59, 130, 246, 0.3);
+        }
+        .nfc-mode-text {
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .nfc-mode-sub {
+            color: #64748b;
+            font-size: 13px;
+        }
+        @keyframes nfc-ring-expand {
+            0% { transform: scale(1); opacity: 0.6; border-color: rgba(59, 130, 246, 0.4); }
+            100% { transform: scale(2.2); opacity: 0; border-color: rgba(59, 130, 246, 0); }
+        }
+
+        @keyframes nfc-btn-pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(59,130,246,0); }
+        }
+        @keyframes nfc-dot-blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
     </style>
 
     {{-- JAVASCRIPT --}}
@@ -518,6 +672,12 @@
                 audioCtx: null,
                 feedbackTimeout: null,
 
+                // NFC
+                nfcSupported: false,
+                nfcActive: false,
+                nfcReader: null,
+                nfcAbortController: null,
+
                 // Bottom sheet
                 sheetHeight: 0,
                 sheetMinHeight: 0,
@@ -529,6 +689,9 @@
                 dragStartHeight: 0,
 
                 async init() {
+                    // NFC feature detection
+                    this.nfcSupported = 'NDEFReader' in window;
+
                     // Viewport meta
                     const meta = document.querySelector('meta[name="viewport"]');
                     if (meta) {
@@ -740,10 +903,139 @@
                     } catch(e) {}
                 },
 
+                // --- NFC ---
+                async toggleNfc() {
+                    if (this.nfcActive) {
+                        // Switch back to camera mode
+                        this.stopNfc();
+                        await this.startScanner();
+                    } else {
+                        // Switch to NFC mode: stop camera first
+                        await this.stopCamera();
+                        await this.startNfc();
+                    }
+                },
+
+                async stopCamera() {
+                    if (this.scanner) {
+                        try { await this.scanner.stop(); } catch(e) {}
+                        this.scanner = null;
+                    }
+                    // Force-release all camera streams
+                    const container = document.getElementById('qr-reader-mobile');
+                    if (container) {
+                        const videos = container.querySelectorAll('video');
+                        videos.forEach(v => {
+                            if (v.srcObject) {
+                                v.srcObject.getTracks().forEach(t => t.stop());
+                                v.srcObject = null;
+                            }
+                        });
+                        container.innerHTML = '';
+                    }
+                },
+
+                async startNfc() {
+                    if (!this.nfcSupported) return;
+
+                    try {
+                        this.nfcReader = new NDEFReader();
+                        this.nfcAbortController = new AbortController();
+
+                        // Bind event listeners BEFORE calling scan()
+                        this.nfcReader.addEventListener('reading', (event) => {
+                            this.onNfcReading(event);
+                        });
+
+                        this.nfcReader.addEventListener('readingerror', () => {
+                            // Tag detected but unreadable (likely not NDEF-formatted)
+                            this.feedbackMessage = 'Tag NFC d\u00e9tect\u00e9 mais non lisible (format non NDEF). Utilisez des tags NTAG213/215/216.';
+                            this.feedbackBgStyle = 'background:rgba(239,68,68,0.3); color:#fca5a5;';
+                            this.flashClass = 'flash-danger';
+                            setTimeout(() => { this.flashClass = ''; }, 350);
+                            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                            this.playBeep('danger');
+                            if (this.feedbackTimeout) clearTimeout(this.feedbackTimeout);
+                        });
+
+                        await this.nfcReader.scan({ signal: this.nfcAbortController.signal });
+
+                        this.nfcActive = true;
+                        this.cameraError = null;
+                    } catch (err) {
+                        this.nfcActive = false;
+                        const name = err.name || '';
+                        if (name === 'NotAllowedError') {
+                            this.cameraError = 'Permission NFC refus\u00e9e. Autorisez dans les param\u00e8tres du navigateur.';
+                        } else if (name === 'NotSupportedError') {
+                            this.cameraError = 'NFC non disponible sur cet appareil.';
+                        } else if (name === 'AbortError') {
+                            // Scan was aborted (normal stop)
+                        } else {
+                            this.cameraError = 'Erreur NFC: ' + err.message;
+                        }
+                        // If NFC failed to start, restart camera
+                        if (!this.nfcActive) {
+                            await this.startScanner();
+                        }
+                    }
+                },
+
+                stopNfc() {
+                    if (this.nfcAbortController) {
+                        try { this.nfcAbortController.abort(); } catch(e) {}
+                        this.nfcAbortController = null;
+                    }
+                    this.nfcReader = null;
+                    this.nfcActive = false;
+                },
+
+                onNfcReading(event) {
+                    const code = this.extractNfcCode(event);
+                    if (code) {
+                        this.onDecode(code);
+                    }
+                },
+
+                extractNfcCode(event) {
+                    const decoder = new TextDecoder();
+                    if (event.message && event.message.records) {
+                        for (let record of event.message.records) {
+                            // NDEF Text record: skip language code prefix (first byte = lang length)
+                            if (record.recordType === 'text') {
+                                try {
+                                    const data = new Uint8Array(record.data.buffer || record.data);
+                                    const langLen = data[0] & 0x3F;
+                                    const text = decoder.decode(data.slice(1 + langLen));
+                                    if (text && text.trim()) return text.trim();
+                                } catch(e) {}
+                            }
+                            if (record.recordType === 'url') {
+                                try {
+                                    const text = decoder.decode(record.data);
+                                    if (text && text.trim()) return text.trim();
+                                } catch(e) {}
+                            }
+                            if (record.recordType === 'mime' && record.mediaType === 'application/json') {
+                                try {
+                                    const json = JSON.parse(decoder.decode(record.data));
+                                    if (json.code || json.id || json.value) return json.code || json.id || json.value;
+                                } catch(e) {}
+                            }
+                        }
+                    }
+                    // Fallback: serial number
+                    if (event.serialNumber && event.serialNumber !== '') {
+                        return event.serialNumber;
+                    }
+                    return null;
+                },
+
                 goBack() { this.$refs.backLink?.click(); },
 
                 destroy() {
                     if (this.scanner) { try { this.scanner.stop(); } catch(e) {} this.scanner = null; }
+                    this.stopNfc();
                     if (this.audioCtx) { try { this.audioCtx.close(); } catch(e) {} this.audioCtx = null; }
                 }
             };

@@ -17,7 +17,10 @@
       "Bash(wsl -d Ubuntu -- bash -c \"cd /home/kodjo/codes/inventry && php artisan route:list 2>&1 | grep execute\":*)",
       "Bash(wsl -d Ubuntu -- bash -c \"cd /home/kodjo/codes/inventry && php artisan route:clear && php artisan route:list:*)",
       "Bash(powershell.exe -Command \"netsh advfirewall firewall show rule name=''WSL Laravel'' 2>&1\")",
-      "Bash(wsl:*)"
+      "Bash(wsl:*)",
+      "WebFetch(domain:developer.chrome.com)",
+      "WebFetch(domain:googlechrome.github.io)",
+      "WebFetch(domain:code-boxx.com)"
     ],
     "additionalDirectories": [
       "\\home\\kodjo\\codes\\inventry\\app\\Filament\\App\\Resources",

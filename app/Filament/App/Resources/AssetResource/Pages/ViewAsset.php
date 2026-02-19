@@ -128,4 +128,22 @@ class ViewAsset extends ViewRecord
             Actions\EditAction::make(),
         ];
     }
+
+    public function updateAssetField(string $field, mixed $value): void
+    {
+        $allowedFields = [
+            'name', 'category_id', 'manufacturer_id', 'status',
+            'location_id', 'department_id', 'serial_number', 'barcode',
+            'purchase_cost', 'purchase_date', 'warranty_expiry',
+            'depreciation_method', 'useful_life_months', 'salvage_value',
+        ];
+
+        if (! in_array($field, $allowedFields)) {
+            return;
+        }
+
+        $this->record->update([$field => filled($value) ? $value : null]);
+        $this->record->unsetRelations();
+        $this->record->refresh();
+    }
 }

@@ -122,4 +122,9 @@ class Organization extends Model implements HasCurrentTenantLabel
     {
         return $this->hasMany(InventoryItem::class);
     }
+
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(Invitation::class);
+    }
 }

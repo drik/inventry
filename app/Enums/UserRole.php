@@ -46,4 +46,26 @@ enum UserRole: string implements HasLabel, HasColor, HasIcon
             self::User => 'heroicon-o-user',
         };
     }
+
+    public function level(): int
+    {
+        return match ($this) {
+            self::SuperAdmin => 5,
+            self::Admin => 4,
+            self::Manager => 3,
+            self::Technician => 2,
+            self::User => 1,
+        };
+    }
+
+    /**
+     * Get roles that the given role can assign (same level or below, excluding SuperAdmin).
+     */
+    public static function assignableBy(self $role): array
+    {
+        return collect(self::cases())
+            ->filter(fn (self $case) => $case !== self::SuperAdmin && $case->level() <= $role->level())
+            ->values()
+            ->all();
+    }
 }

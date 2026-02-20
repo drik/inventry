@@ -34,7 +34,7 @@ class AppPanelProvider extends PanelProvider
             ->databaseNotifications()
             ->brandLogo(asset('images/logo.png'))
             ->darkModeBrandLogo(asset('images/logo_white.png'))
-            ->brandLogoHeight('2rem')
+            ->brandLogoHeight('4rem')
             ->tenant(Organization::class, slugAttribute: 'slug')
             ->tenantRegistration(RegisterOrganization::class)
             ->tenantProfile(EditOrganizationProfile::class)

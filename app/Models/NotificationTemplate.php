@@ -40,6 +40,10 @@ class NotificationTemplate extends Model
                 'subject' => 'Tâche d\'inventaire terminée',
                 'body' => "Bonjour {creator_name},\n\n{assignee_name} a terminé sa tâche de scan{location_part} pour la session \"{session_name}\".",
             ],
+            'user_invitation' => [
+                'subject' => 'Invitation à rejoindre {organization_name}',
+                'body' => "Bonjour,\n\n{inviter_name} vous invite à rejoindre l'organisation \"{organization_name}\" en tant que {role}.\n\nCliquez sur le lien ci-dessous pour accepter l'invitation et créer votre compte.\n\nCette invitation expire le {expires_at}.",
+            ],
         ];
     }
 

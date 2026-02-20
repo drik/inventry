@@ -34,6 +34,8 @@ class ManageNotificationTemplates extends Page implements HasForms
 
     public ?array $task_completed = [];
 
+    public ?array $user_invitation = [];
+
     public function mount(): void
     {
         $this->loadTemplates();
@@ -54,6 +56,14 @@ class ManageNotificationTemplates extends Page implements HasForms
             'email_enabled' => $completedTemplate->email_enabled,
             'subject' => $completedTemplate->subject,
             'body' => $completedTemplate->body,
+        ];
+
+        $invitationTemplate = NotificationTemplate::getOrDefault('user_invitation');
+
+        $this->user_invitation = [
+            'email_enabled' => $invitationTemplate->email_enabled,
+            'subject' => $invitationTemplate->subject,
+            'body' => $invitationTemplate->body,
         ];
     }
 
@@ -107,11 +117,37 @@ class ManageNotificationTemplates extends Page implements HasForms
             ->statePath('task_completed');
     }
 
+    public function userInvitationForm(Form $form): Form
+    {
+        return $form
+            ->schema([
+                Section::make('User Invitation')
+                    ->description('Sent to users when they are invited to join the organization.')
+                    ->icon('heroicon-o-user-plus')
+                    ->schema([
+                        Toggle::make('email_enabled')
+                            ->label('Send by email')
+                            ->helperText('When disabled, invitations will not be sent.'),
+                        TextInput::make('subject')
+                            ->label('Email subject')
+                            ->required()
+                            ->maxLength(255),
+                        Textarea::make('body')
+                            ->label('Email body')
+                            ->required()
+                            ->rows(6)
+                            ->helperText('Available placeholders: {organization_name}, {inviter_name}, {role}, {email}, {expires_at}'),
+                    ]),
+            ])
+            ->statePath('user_invitation');
+    }
+
     protected function getForms(): array
     {
         return [
             'taskAssignedForm',
             'taskCompletedForm',
+            'userInvitationForm',
         ];
     }
 
@@ -119,7 +155,7 @@ class ManageNotificationTemplates extends Page implements HasForms
     {
         $orgId = Filament::getTenant()->id;
 
-        foreach (['task_assigned', 'task_completed'] as $type) {
+        foreach (['task_assigned', 'task_completed', 'user_invitation'] as $type) {
             $data = $this->{$type};
 
             NotificationTemplate::updateOrCreate(
@@ -146,7 +182,7 @@ class ManageNotificationTemplates extends Page implements HasForms
         $orgId = Filament::getTenant()->id;
 
         NotificationTemplate::where('organization_id', $orgId)
-            ->whereIn('type', ['task_assigned', 'task_completed'])
+            ->whereIn('type', ['task_assigned', 'task_completed', 'user_invitation'])
             ->delete();
 
         $this->loadTemplates();

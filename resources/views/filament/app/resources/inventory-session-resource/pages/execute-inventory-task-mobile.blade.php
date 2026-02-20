@@ -380,12 +380,12 @@
             left: 0;
             right: 0;
             z-index: 20;
-            background: #111827;
+            background: #ffffff;
             border-radius: 16px 16px 0 0;
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            box-shadow: 0 -4px 24px rgba(0,0,0,0.5);
+            box-shadow: 0 -4px 24px rgba(0,0,0,0.15);
             will-change: height;
         }
         .bottom-sheet.sheet-transitioning {
@@ -404,7 +404,7 @@
             width: 36px;
             height: 4px;
             border-radius: 999px;
-            background: #4b5563;
+            background: #d1d5db;
             margin: 0 auto 8px;
         }
         .sheet-handle-label {
@@ -415,7 +415,7 @@
             color: #6b7280;
         }
         .sheet-handle-count {
-            color: #9ca3af;
+            color: #374151;
             font-weight: 500;
         }
 
@@ -424,8 +424,8 @@
             display: flex;
             gap: 4px;
             padding: 6px 12px;
-            background: #1f2937;
-            border-bottom: 1px solid #374151;
+            background: #f9fafb;
+            border-bottom: 1px solid #e5e7eb;
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
             flex-shrink: 0;
@@ -439,8 +439,8 @@
             font-weight: 500;
             border: none;
             cursor: pointer;
-            background: #374151;
-            color: #9ca3af;
+            background: #e5e7eb;
+            color: #6b7280;
             display: flex;
             align-items: center;
             gap: 4px;
@@ -449,7 +449,7 @@
         .asset-list-tab.active { background: #3b82f6; color: #fff; }
         .tab-count {
             font-size: 10px;
-            background: rgba(0,0,0,0.2);
+            background: rgba(0,0,0,0.15);
             padding: 1px 6px;
             border-radius: 999px;
         }
@@ -467,16 +467,16 @@
             align-items: center;
             gap: 12px;
             padding: 10px 12px;
-            border-bottom: 1px solid #1f2937;
+            border-bottom: 1px solid #f3f4f6;
         }
-        .asset-list-row.row-found { background: rgba(34, 197, 94, 0.08); }
+        .asset-list-row.row-found { background: rgba(34, 197, 94, 0.06); }
 
         .asset-thumb {
             width: 44px;
             height: 44px;
             border-radius: 8px;
             overflow: hidden;
-            background: #374151;
+            background: #f3f4f6;
             flex-shrink: 0;
             display: flex;
             align-items: center;
@@ -488,14 +488,14 @@
         .asset-name {
             font-size: 13px;
             font-weight: 600;
-            color: #fff;
+            color: #111827;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
         }
         .asset-meta {
             font-size: 11px;
-            color: #9ca3af;
+            color: #6b7280;
             margin-top: 2px;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -505,13 +505,13 @@
         .asset-status-dot { flex-shrink: 0; }
         .asset-status-dot span { display: block; width: 10px; height: 10px; border-radius: 50%; }
 
-        .asset-list-empty { padding: 32px; text-align: center; color: #6b7280; font-size: 13px; }
+        .asset-list-empty { padding: 32px; text-align: center; color: #9ca3af; font-size: 13px; }
 
         /* Actions */
         .asset-list-actions {
             padding: 10px 12px;
-            background: #1f2937;
-            border-top: 1px solid #374151;
+            background: #f9fafb;
+            border-top: 1px solid #e5e7eb;
             display: flex;
             gap: 8px;
             flex-shrink: 0;
@@ -532,8 +532,8 @@
             transition: opacity 0.15s;
         }
         .action-btn:active { opacity: 0.8; }
-        .action-btn-success { background: #22c55e; color: #000; }
-        .action-btn-warning { background: #eab308; color: #000; }
+        .action-btn-success { background: #22c55e; color: #fff; }
+        .action-btn-warning { background: #eab308; color: #fff; }
 
         /* NFC toggle button */
         .nfc-toggle {

@@ -13,7 +13,9 @@ use Filament\Pages;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\View\PanelsRenderHook;
 use Filament\Widgets;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -33,6 +35,10 @@ class AppPanelProvider extends PanelProvider
             ->login()
             ->registration()
             ->databaseNotifications()
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn (): string => Blade::render('@livewire(\'notification-alert-manager\')'),
+            )
             ->brandLogo(asset('images/logo.png'))
             ->darkModeBrandLogo(asset('images/logo_white.png'))
             ->brandLogoHeight('4rem')

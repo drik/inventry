@@ -2,8 +2,10 @@
 
 namespace App\Notifications;
 
+use App\Filament\App\Resources\InventorySessionResource;
 use App\Models\InventoryTask;
 use App\Models\NotificationTemplate;
+use Filament\Notifications\Actions\Action;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -42,11 +44,23 @@ class InventoryTaskAssigned extends Notification
     {
         $rendered = $this->getRendered($notifiable);
 
+        $url = InventorySessionResource::getUrl('execute-task', [
+            'record' => $this->task->session_id,
+            'taskId' => $this->task->id,
+            'tenant' => $this->task->session->organization,
+        ]);
+
         return \Filament\Notifications\Notification::make()
             ->title($rendered['subject'])
             ->body(str_replace("\n", ' ', mb_substr($rendered['body'], 0, 120)) . '...')
             ->icon('heroicon-o-clipboard-document-check')
             ->info()
+            ->actions([
+                Action::make('scan')
+                    ->label('Commencer le scan')
+                    ->url($url)
+                    ->button(),
+            ])
             ->getDatabaseMessage();
     }
 

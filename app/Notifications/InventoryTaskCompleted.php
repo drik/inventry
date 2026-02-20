@@ -2,8 +2,10 @@
 
 namespace App\Notifications;
 
+use App\Filament\App\Resources\InventorySessionResource;
 use App\Models\InventoryTask;
 use App\Models\NotificationTemplate;
+use Filament\Notifications\Actions\Action;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -42,11 +44,22 @@ class InventoryTaskCompleted extends Notification
     {
         $rendered = $this->getRendered($notifiable);
 
+        $url = InventorySessionResource::getUrl('view', [
+            'record' => $this->task->session_id,
+            'tenant' => $this->task->session->organization,
+        ]);
+
         return \Filament\Notifications\Notification::make()
             ->title($rendered['subject'])
             ->body(str_replace("\n", ' ', mb_substr($rendered['body'], 0, 120)) . '...')
             ->icon('heroicon-o-check-circle')
             ->success()
+            ->actions([
+                Action::make('view')
+                    ->label('Voir la session')
+                    ->url($url)
+                    ->button(),
+            ])
             ->getDatabaseMessage();
     }
 

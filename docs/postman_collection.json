@@ -1,0 +1,480 @@
+{
+  "info": {
+    "name": "Inventry API",
+    "description": "API REST pour l'application mobile Inventry Scanner.\n\nAuthentification : Laravel Sanctum (Bearer Token)\n\n## Utilisation\n1. Exécuter la requête **Login** pour obtenir un token\n2. Le token est automatiquement stocké dans la variable `{{token}}`\n3. Toutes les autres requêtes utilisent ce token automatiquement",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000/api",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "task_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.token) {",
+                  "    pm.collectionVariables.set('token', jsonData.token);",
+                  "    console.log('Token saved:', jsonData.token.substring(0, 20) + '...');",
+                  "}",
+                  "",
+                  "pm.test('Login successful', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(jsonData).to.have.property('token');",
+                  "    pm.expect(jsonData).to.have.property('user');",
+                  "    pm.expect(jsonData.user).to.have.property('organization');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@admin.com\",\n  \"password\": \"password\",\n  \"device_name\": \"Postman\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Authentification et obtention d'un token Sanctum.\n\nLe token est automatiquement sauvegardé dans la variable `{{token}}` pour les requêtes suivantes."
+          }
+        },
+        {
+          "name": "Me",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('User info returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.user).to.have.property('id');",
+                  "    pm.expect(jsonData.user).to.have.property('email');",
+                  "    pm.expect(jsonData.user).to.have.property('role');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "me"]
+            },
+            "description": "Retourne les informations de l'utilisateur connecté et son organisation."
+          }
+        },
+        {
+          "name": "Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Logout successful', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.message).to.eql('Déconnexion réussie.');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "logout"]
+            },
+            "description": "Révoque le token courant. Après cette requête, le token ne sera plus valide."
+          }
+        }
+      ],
+      "description": "Endpoints d'authentification (Laravel Sanctum)"
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "Get Dashboard Stats",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Dashboard stats returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('stats');",
+                  "    pm.expect(jsonData.stats).to.have.property('pending');",
+                  "    pm.expect(jsonData.stats).to.have.property('in_progress');",
+                  "    pm.expect(jsonData.stats).to.have.property('completed_today');",
+                  "    pm.expect(jsonData.stats).to.have.property('completed_total');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/dashboard",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard"]
+            },
+            "description": "Statistiques des tâches de l'utilisateur connecté :\n- pending : tâches en attente (session InProgress)\n- in_progress : tâches en cours\n- completed_today : terminées aujourd'hui\n- completed_total : total terminées\n- current_task : tâche en cours avec progression (ou null)"
+          }
+        }
+      ],
+      "description": "Tableau de bord et statistiques"
+    },
+    {
+      "name": "Tasks",
+      "item": [
+        {
+          "name": "List Tasks",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Tasks list returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('data');",
+                  "    pm.expect(jsonData).to.have.property('meta');",
+                  "    if (jsonData.data.length > 0) {",
+                  "        pm.collectionVariables.set('task_id', jsonData.data[0].id);",
+                  "        console.log('First task_id saved:', jsonData.data[0].id);",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tasks",
+              "host": ["{{base_url}}"],
+              "path": ["tasks"],
+              "query": [
+                { "key": "status", "value": "pending", "disabled": true },
+                { "key": "status", "value": "in_progress", "disabled": true },
+                { "key": "status", "value": "completed", "disabled": true },
+                { "key": "page", "value": "1", "disabled": true }
+              ]
+            },
+            "description": "Liste paginée des tâches assignées à l'utilisateur.\n\nFiltres optionnels :\n- `status` : pending, in_progress, completed\n- `page` : numéro de page (15 par page)\n\nTri : in_progress > pending > completed\n\nLe premier task_id est automatiquement sauvegardé dans `{{task_id}}`."
+          }
+        },
+        {
+          "name": "List Tasks (pending only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tasks?status=pending",
+              "host": ["{{base_url}}"],
+              "path": ["tasks"],
+              "query": [
+                { "key": "status", "value": "pending" }
+              ]
+            },
+            "description": "Liste des tâches en attente uniquement."
+          }
+        },
+        {
+          "name": "Download Task (offline)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Task download data returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('task');",
+                  "    pm.expect(jsonData).to.have.property('session');",
+                  "    pm.expect(jsonData).to.have.property('items');",
+                  "    pm.expect(jsonData).to.have.property('assets');",
+                  "    pm.expect(jsonData).to.have.property('all_asset_barcodes');",
+                  "    pm.expect(jsonData).to.have.property('downloaded_at');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/download",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "download"]
+            },
+            "description": "Télécharge toutes les données d'une tâche pour le mode hors ligne :\n- task : infos de la tâche\n- session : infos de la session\n- location : emplacement\n- items : items d'inventaire (assets attendus)\n- assets : détails complets des assets (nom, code, image, tags)\n- all_asset_barcodes : index léger de tous les barcodes de l'organisation (pour résolution offline des assets inattendus)"
+          }
+        },
+        {
+          "name": "Start Task",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/start",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "start"]
+            },
+            "description": "Démarre une tâche (pending → in_progress).\n\nRetourne une erreur 422 si la tâche n'est pas en statut `pending`."
+          }
+        },
+        {
+          "name": "Scan Barcode",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var status = pm.response.code;",
+                  "if (status === 200) {",
+                  "    pm.test('Scan result returned', function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData).to.have.property('found');",
+                  "        pm.expect(jsonData).to.have.property('asset');",
+                  "    });",
+                  "} else if (status === 404) {",
+                  "    pm.test('Asset not found', function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData.found).to.eql(false);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"barcode\": \"AST-00001\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/scan",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "scan"]
+            },
+            "description": "Scan d'un barcode en mode connecté.\n\nRésolution dans l'ordre :\n1. Asset.barcode (exact)\n2. Asset.asset_code (exact)\n3. AssetTagValue.value (exact)\n\nRéponses possibles :\n- 200 found + is_unexpected=false : asset trouvé et attendu → marqué Found\n- 200 found + is_unexpected=true : asset trouvé mais pas dans la liste\n- 200 found + already_scanned=true : déjà scanné\n- 404 : aucun asset trouvé"
+          }
+        },
+        {
+          "name": "Add Unexpected",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"asset_id\": \"REPLACE_WITH_ASSET_ID\",\n  \"condition_notes\": \"Trouvé dans la salle B\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/unexpected",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "unexpected"]
+            },
+            "description": "Ajoute un asset inattendu à la session d'inventaire.\n\nUtilisé après un scan qui retourne `is_unexpected: true`.\n\nRetourne 201 si créé, 422 si l'asset est déjà dans la session."
+          }
+        },
+        {
+          "name": "Complete Task",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/complete",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "complete"]
+            },
+            "description": "Termine une tâche (in_progress → completed).\n\nActions effectuées :\n- Marque les items non scannés comme Missing\n- Envoie une notification au créateur de la session\n- Met à jour les compteurs de la session\n\nRetourne 422 si la tâche n'est pas en statut `in_progress`."
+          }
+        }
+      ],
+      "description": "Gestion des tâches d'inventaire"
+    },
+    {
+      "name": "Sync",
+      "item": [
+        {
+          "name": "Sync Scans",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Sync response returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('synced_count');",
+                  "    pm.expect(jsonData).to.have.property('conflicts');",
+                  "    pm.expect(jsonData).to.have.property('items');",
+                  "    pm.expect(jsonData).to.have.property('synced_at');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scans\": [\n    {\n      \"item_id\": \"REPLACE_WITH_ITEM_ID\",\n      \"status\": \"found\",\n      \"scanned_at\": \"2026-02-20T10:35:00Z\",\n      \"condition_notes\": null\n    }\n  ],\n  \"task_status\": \"in_progress\",\n  \"task_notes\": \"Zone A en cours\",\n  \"last_synced_at\": \"2026-02-20T10:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/sync",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "sync"]
+            },
+            "description": "Synchronisation des scans effectués hors ligne.\n\nChaque scan peut être :\n- **item_id + status** : met à jour un item existant (found)\n- **asset_id + status** (item_id=null) : crée un item unexpected\n\n**Gestion des conflits** : si un item a déjà été scanné par un autre utilisateur avec un `scanned_at` plus récent, le scan mobile est ignoré et retourné dans `conflicts`.\n\nLe champ `task_status` peut être `in_progress` ou `completed`.\nSi `completed`, la tâche est terminée et les notifications sont envoyées."
+          }
+        },
+        {
+          "name": "Sync (with unexpected)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scans\": [\n    {\n      \"item_id\": null,\n      \"asset_id\": \"REPLACE_WITH_ASSET_ID\",\n      \"status\": \"unexpected\",\n      \"scanned_at\": \"2026-02-20T10:36:00Z\",\n      \"condition_notes\": \"Trouvé hors emplacement\"\n    }\n  ],\n  \"task_status\": \"in_progress\",\n  \"task_notes\": null,\n  \"last_synced_at\": \"2026-02-20T10:30:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/sync",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "sync"]
+            },
+            "description": "Exemple de sync avec un asset inattendu.\n\nQuand `item_id` est null et `asset_id` est fourni, un nouvel InventoryItem est créé avec le statut `unexpected`."
+          }
+        },
+        {
+          "name": "Check Sync Status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Sync status returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('has_changes');",
+                  "    pm.expect(jsonData).to.have.property('items_changed');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/sync-status?since=2026-02-20T00:00:00Z",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "sync-status"],
+              "query": [
+                { "key": "since", "value": "2026-02-20T00:00:00Z" }
+              ]
+            },
+            "description": "Vérifie s'il y a des changements côté serveur depuis le dernier sync.\n\nParamètre requis : `since` (datetime ISO 8601)\n\nUtilisé par le mobile pour savoir s'il doit télécharger les mises à jour avant de synchroniser."
+          }
+        }
+      ],
+      "description": "Synchronisation offline/online"
+    }
+  ]
+}

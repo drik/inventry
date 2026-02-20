@@ -6,10 +6,9 @@ use App\Enums\InventoryItemStatus;
 use App\Enums\InventorySessionStatus;
 use App\Filament\App\Resources\InventorySessionResource;
 use App\Models\Asset;
-use App\Models\InventoryItem;
 use App\Models\InventorySession;
 use App\Models\InventoryTask;
-use App\Notifications\InventoryTaskCompleted;
+use App\Services\InventoryScanService;
 use Filament\Facades\Filament;
 use Filament\Resources\Pages\Page;
 use Illuminate\Support\Facades\Auth;
@@ -92,6 +91,11 @@ class ExecuteInventoryTask extends Page
         return $query;
     }
 
+    protected function scanService(): InventoryScanService
+    {
+        return app(InventoryScanService::class);
+    }
+
     public function scanBarcode(): void
     {
         $code = trim($this->barcode);
@@ -101,13 +105,10 @@ class ExecuteInventoryTask extends Page
             return;
         }
 
-        $asset = Asset::where('barcode', $code)
-            ->orWhere('asset_code', $code)
-            ->orWhereHas('tagValues', fn ($q) => $q->where('value', $code))
-            ->first();
+        $result = $this->scanService()->scanBarcode($code, $this->record, $this->task, Auth::id());
 
-        if (! $asset) {
-            $this->scanFeedback = "No asset found with code: {$code}";
+        if (! $result['found']) {
+            $this->scanFeedback = $result['message'];
             $this->scanFeedbackType = 'danger';
             $this->lastScannedAsset = null;
             $this->dispatch('barcode-processed');
@@ -115,22 +116,13 @@ class ExecuteInventoryTask extends Page
             return;
         }
 
-        // Find matching InventoryItem in this session
-        $item = $this->record->items()
-            ->where('asset_id', $asset->id)
-            ->first();
+        $asset = $result['asset'];
 
-        if ($item) {
-            if ($item->status === InventoryItemStatus::Found) {
+        if (! $result['is_unexpected']) {
+            if ($result['already_scanned']) {
                 $this->scanFeedback = "{$asset->asset_code} — {$asset->name} already marked as found.";
                 $this->scanFeedbackType = 'warning';
             } else {
-                $item->update([
-                    'status' => InventoryItemStatus::Found,
-                    'scanned_at' => now(),
-                    'scanned_by' => Auth::id(),
-                    'task_id' => $this->task->id,
-                ]);
                 $this->refreshCounters();
                 $this->scanFeedback = "{$asset->asset_code} — {$asset->name} marked as Found!";
                 $this->scanFeedbackType = 'success';
@@ -174,19 +166,9 @@ class ExecuteInventoryTask extends Page
             return;
         }
 
-        $exists = $this->record->items()
-            ->where('asset_id', $asset->id)
-            ->exists();
+        $item = $this->scanService()->addUnexpected($asset, $this->record, $this->task, Auth::id());
 
-        if (! $exists) {
-            $this->record->items()->create([
-                'organization_id' => Filament::getTenant()->id,
-                'asset_id' => $asset->id,
-                'task_id' => $this->task->id,
-                'status' => InventoryItemStatus::Unexpected,
-                'scanned_at' => now(),
-                'scanned_by' => Auth::id(),
-            ]);
+        if ($item) {
             $this->refreshCounters();
             $this->scanFeedback = "{$asset->asset_code} added as unexpected item.";
             $this->scanFeedbackType = 'success';
@@ -197,37 +179,20 @@ class ExecuteInventoryTask extends Page
     public function markItemFound(string $itemId): void
     {
         $item = $this->record->items()->findOrFail($itemId);
-        $item->update([
-            'status' => InventoryItemStatus::Found,
-            'scanned_at' => now(),
-            'scanned_by' => Auth::id(),
-            'task_id' => $this->task->id,
-        ]);
+        $this->scanService()->markItemFound($item, $this->task, Auth::id());
         $this->refreshCounters();
     }
 
     public function markItemMissing(string $itemId): void
     {
         $item = $this->record->items()->findOrFail($itemId);
-        $item->update(['status' => InventoryItemStatus::Missing]);
+        $this->scanService()->markItemMissing($item);
         $this->refreshCounters();
     }
 
     public function completeTask(): void
     {
-        $this->task->update([
-            'status' => 'completed',
-            'completed_at' => now(),
-        ]);
-
-        // Notify session creator
-        $creator = $this->task->session->creator;
-        if ($creator && $creator->id !== Auth::id()) {
-            $creator->notify(new InventoryTaskCompleted($this->task));
-        }
-
-        // Also refresh session counters
-        $this->refreshSessionCounters();
+        $this->scanService()->completeTask($this->task, Auth::id());
 
         $this->redirect(route('filament.app.pages.my-inventory-tasks', [
             'tenant' => Filament::getTenant(),
@@ -270,18 +235,5 @@ class ExecuteInventoryTask extends Page
     protected function refreshCounters(): void
     {
         unset($this->items, $this->stats);
-        $this->refreshSessionCounters();
-    }
-
-    protected function refreshSessionCounters(): void
-    {
-        $session = $this->record;
-        $session->update([
-            'total_scanned' => $session->items()->whereNotNull('scanned_at')->count(),
-            'total_matched' => $session->items()->where('status', InventoryItemStatus::Found)->count(),
-            'total_missing' => $session->items()->where('status', InventoryItemStatus::Missing)->count(),
-            'total_unexpected' => $session->items()->where('status', InventoryItemStatus::Unexpected)->count(),
-        ]);
-        $session->refresh();
     }
 }

@@ -7,11 +7,14 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "andreiio/blade-remix-icon": "^3.9",
+        "davidhsianturi/blade-bootstrap-icons": "^2.1",
         "filament/filament": "^3.0",
         "hasnayeen/themes": "^3.0",
         "laravel/framework": "^12.0",
         "laravel/sanctum": "^4.3",
-        "laravel/tinker": "^2.10.1"
+        "laravel/tinker": "^2.10.1",
+        "owenvoke/blade-fontawesome": "^2.9"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

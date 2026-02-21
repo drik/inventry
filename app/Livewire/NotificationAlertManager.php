@@ -9,13 +9,6 @@ use Livewire\Component;
 
 class NotificationAlertManager extends Component
 {
-    public ?string $lastCheckedAt = null;
-
-    public function mount(): void
-    {
-        $this->lastCheckedAt = now()->toIso8601String();
-    }
-
     public function checkNewNotifications(): void
     {
         $user = Auth::user();
@@ -24,8 +17,8 @@ class NotificationAlertManager extends Component
             return;
         }
 
-        $newNotifications = $user->unreadNotifications()
-            ->where('created_at', '>', $this->lastCheckedAt)
+        $newNotifications = $user->notifications()
+            ->whereNull('shown_at')
             ->latest()
             ->get();
 
@@ -87,9 +80,9 @@ class NotificationAlertManager extends Component
             }
 
             $notification->send();
-        }
 
-        $this->lastCheckedAt = now()->toIso8601String();
+            $dbNotification->update(['shown_at' => now()]);
+        }
     }
 
     public function render()

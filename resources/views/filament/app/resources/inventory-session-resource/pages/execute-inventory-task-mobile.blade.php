@@ -16,7 +16,7 @@
             <div id="qr-reader-mobile" class="scanner-video-container" wire:ignore></div>
 
             {{-- Viewfinder (camera mode) --}}
-            <div class="viewfinder" x-show="!nfcActive" x-transition.opacity.duration.200ms>
+            <div class="viewfinder" x-show="!nfcActive && !manualMode" x-transition.opacity.duration.200ms>
                 <div class="viewfinder-corner viewfinder-tl"></div>
                 <div class="viewfinder-corner viewfinder-tr"></div>
                 <div class="viewfinder-corner viewfinder-bl"></div>
@@ -30,13 +30,40 @@
                     <div class="nfc-ring nfc-ring-2"></div>
                     <div class="nfc-ring nfc-ring-3"></div>
                     <div class="nfc-center-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 0 1 7.424-7.424m-1.414 1.414a3 3 0 0 0-4.243 0m0 4.243a3 3 0 0 0 4.243 0m1.414 1.414a5.25 5.25 0 0 1-7.424 0M5.106 18.894c-3.808-3.808-3.808-9.98 0-13.788m13.788 0c3.808 3.808 3.808 9.98 0 13.788"/>
-                        </svg>
+                        <x-fab-nfc-directional class="w-16 h-16" />
                     </div>
                 </div>
                 <div class="nfc-mode-text">Approchez-vous d'un tag NFC</div>
                 <div class="nfc-mode-sub">Placez le dos du t&eacute;l&eacute;phone contre le tag</div>
+            </div>
+
+            {{-- Manual input mode overlay (replaces camera view) --}}
+            <div class="manual-mode-overlay" x-show="manualMode" x-transition.opacity.duration.300ms x-cloak>
+                <div class="manual-scan-zone">
+                    <div class="manual-center-icon">
+                        <x-bi-keyboard class="w-16 h-16" />
+                    </div>
+                </div>
+                <div class="manual-mode-text">Saisie manuelle</div>
+                <div class="manual-mode-sub">Entrez le code barcode ou le code asset ci-dessous</div>
+
+                <div class="manual-input-inline">
+                    <input
+                        type="text"
+                        x-model="manualCode"
+                        x-ref="manualInput"
+                        x-on:keydown.enter="submitManualCode()"
+                        class="manual-input-field"
+                        placeholder="Code barcode / asset..."
+                        autocomplete="off"
+                        autocapitalize="off"
+                        spellcheck="false"
+                    />
+                    <button x-on:click="submitManualCode()" class="manual-search-btn" type="button"
+                            :disabled="!manualCode.trim()">
+                        <x-heroicon-s-magnifying-glass class="w-5 h-5" />
+                    </button>
+                </div>
             </div>
 
             {{-- Scan flash --}}
@@ -60,9 +87,7 @@
                     type="button"
                     x-cloak
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 0 1 7.424-7.424m-1.414 1.414a3 3 0 0 0-4.243 0m0 4.243a3 3 0 0 0 4.243 0m1.414 1.414a5.25 5.25 0 0 1-7.424 0M5.106 18.894c-3.808-3.808-3.808-9.98 0-13.788m13.788 0c3.808 3.808 3.808 9.98 0 13.788"/>
-                    </svg>
+                    <x-ri-rfid-line class="w-5 h-5" />
                 </button>
                 <div x-show="!nfcSupported" style="width:40px;" x-cloak></div>
             </div>
@@ -71,6 +96,31 @@
             <div x-show="nfcActive" x-cloak class="nfc-indicator">
                 <span class="nfc-indicator-dot"></span>
                 NFC
+            </div>
+
+            {{-- Right-side floating action buttons --}}
+            <div class="scanner-right-actions">
+                {{-- Flash toggle --}}
+                <button
+                    x-show="!nfcActive && !manualMode"
+                    x-on:click="toggleFlash()"
+                    class="scanner-action-btn"
+                    :class="{ 'active': flashActive, 'disabled': !flashSupported }"
+                    type="button"
+                    x-cloak
+                >
+                    <x-heroicon-s-bolt class="w-5 h-5" />
+                </button>
+
+                {{-- Manual input toggle --}}
+                <button
+                    x-on:click="toggleManualMode()"
+                    class="scanner-action-btn"
+                    :class="{ 'active': manualMode }"
+                    type="button"
+                >
+                    <x-bi-keyboard-fill class="w-5 h-5" />
+                </button>
             </div>
 
             {{-- Feedback + progress (above bottom sheet) --}}
@@ -581,6 +631,135 @@
             animation: nfc-dot-blink 1.5s ease-in-out infinite;
         }
 
+        /* Right-side floating action buttons */
+        .scanner-right-actions {
+            position: absolute;
+            top: calc(90px + env(safe-area-inset-top));
+            right: 16px;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .scanner-action-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.45);
+            color: #fff;
+            border: 1.5px solid rgba(255, 255, 255, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+        .scanner-action-btn:active { opacity: 0.7; transform: scale(0.92); }
+        .scanner-action-btn.active {
+            background: #3b82f6;
+            border-color: #3b82f6;
+            color: #fff;
+            box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+        }
+        .scanner-action-btn.disabled {
+            opacity: 0.35;
+        }
+
+        /* Manual mode overlay */
+        .manual-mode-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 4;
+            background: radial-gradient(ellipse at center, #1e293b 0%, #0f172a 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            padding: 0 24px;
+            padding-bottom: 45%;
+        }
+        .manual-scan-zone {
+            position: relative;
+            width: 160px;
+            height: 160px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .manual-center-icon {
+            position: relative;
+            z-index: 2;
+            color: #3b82f6;
+            background: rgba(59, 130, 246, 0.1);
+            width: 88px;
+            height: 88px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid rgba(59, 130, 246, 0.3);
+        }
+        .manual-mode-text {
+            color: #fff;
+            font-size: 16px;
+            font-weight: 600;
+            margin-top: -16px;
+        }
+        .manual-mode-sub {
+            color: #64748b;
+            font-size: 13px;
+            margin-top: -20px;
+            text-align: center;
+        }
+        .manual-input-inline {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+            max-width: 360px;
+            margin-top: 4px;
+        }
+        .manual-input-field {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            padding: 12px 16px;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 500;
+            outline: none;
+        }
+        .manual-input-field:focus {
+            border-color: #3b82f6;
+            background: rgba(255, 255, 255, 0.12);
+        }
+        .manual-input-field::placeholder {
+            color: rgba(255, 255, 255, 0.35);
+        }
+        .manual-search-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: #3b82f6;
+            color: #fff;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: all 0.15s ease;
+        }
+        .manual-search-btn:active { opacity: 0.8; transform: scale(0.95); }
+        .manual-search-btn:disabled {
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.25);
+            cursor: default;
+        }
+
         /* NFC mode overlay */
         .nfc-mode-overlay {
             position: absolute;
@@ -673,6 +852,14 @@
                 ignoredCodes: new Map(),
                 audioCtx: null,
                 feedbackTimeout: null,
+
+                // Flash / Torch
+                flashSupported: false,
+                flashActive: false,
+
+                // Manual input
+                manualMode: false,
+                manualCode: '',
 
                 // NFC
                 nfcSupported: false,
@@ -805,6 +992,8 @@
                             (decodedText) => this.onDecode(decodedText),
                             () => {}
                         );
+                        // Detect torch support after camera is fully ready
+                        setTimeout(() => this.detectFlashSupport(), 800);
                     } catch (err) {
                         const errStr = err.toString();
                         if (errStr.includes('NotAllowedError')) {
@@ -905,6 +1094,89 @@
                     } catch(e) {}
                 },
 
+                // --- Flash / Torch ---
+                getVideoTrack() {
+                    // Try all video elements inside the scanner container
+                    const videos = document.querySelectorAll('#qr-reader-mobile video');
+                    for (const video of videos) {
+                        if (video.srcObject) {
+                            const track = video.srcObject.getVideoTracks()[0];
+                            if (track && track.readyState === 'live') return track;
+                        }
+                    }
+                    // Fallback: any active video on the page
+                    const allVideos = document.querySelectorAll('video');
+                    for (const video of allVideos) {
+                        if (video.srcObject) {
+                            const track = video.srcObject.getVideoTracks()[0];
+                            if (track && track.readyState === 'live') return track;
+                        }
+                    }
+                    return null;
+                },
+
+                detectFlashSupport() {
+                    try {
+                        const track = this.getVideoTrack();
+                        if (track && track.getCapabilities) {
+                            const capabilities = track.getCapabilities();
+                            this.flashSupported = !!capabilities.torch;
+                        } else {
+                            this.flashSupported = false;
+                        }
+                    } catch(e) {
+                        this.flashSupported = false;
+                    }
+                },
+
+                async toggleFlash() {
+                    if (!this.flashSupported) {
+                        this.feedbackMessage = 'Flash non disponible sur cet appareil.';
+                        this.feedbackBgStyle = 'background:rgba(234,179,8,0.3); color:#fde047;';
+                        if (this.feedbackTimeout) clearTimeout(this.feedbackTimeout);
+                        this.feedbackTimeout = setTimeout(() => { this.feedbackMessage = null; }, 3000);
+                        return;
+                    }
+                    try {
+                        const track = this.getVideoTrack();
+                        if (track) {
+                            this.flashActive = !this.flashActive;
+                            await track.applyConstraints({ advanced: [{ torch: this.flashActive }] });
+                        }
+                    } catch(e) {
+                        this.flashActive = false;
+                    }
+                },
+
+                // --- Manual input ---
+                async toggleManualMode() {
+                    if (this.manualMode) {
+                        // Exit manual mode: restart camera
+                        this.manualMode = false;
+                        this.manualCode = '';
+                        await this.startScanner();
+                    } else {
+                        // Enter manual mode: stop camera
+                        await this.stopCamera();
+                        this.manualMode = true;
+                        this.$nextTick(() => {
+                            this.$refs.manualInput?.focus();
+                        });
+                    }
+                },
+
+                submitManualCode() {
+                    const code = this.manualCode.trim();
+                    if (!code) return;
+                    this.manualCode = '';
+                    this.$wire.set('barcode', code);
+                    this.$wire.scanBarcode();
+                    // Keep manual mode open for next scan
+                    this.$nextTick(() => {
+                        this.$refs.manualInput?.focus();
+                    });
+                },
+
                 // --- NFC ---
                 async toggleNfc() {
                     if (this.nfcActive) {
@@ -919,6 +1191,8 @@
                 },
 
                 async stopCamera() {
+                    this.flashActive = false;
+                    this.flashSupported = false;
                     if (this.scanner) {
                         try { await this.scanner.stop(); } catch(e) {}
                         this.scanner = null;

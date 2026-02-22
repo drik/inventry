@@ -1,96 +1,108 @@
 <x-filament-panels::page>
+    <style>
+        .usage-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+        @media (min-width: 640px) {
+            .usage-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        @media (min-width: 1024px) {
+            .usage-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+    </style>
+
     {{-- Current Plan & Status --}}
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div class="lg:col-span-2">
-            <x-filament::section>
-                <x-slot name="heading">Plan actuel</x-slot>
+    <x-filament::section>
+        <x-slot name="heading">Plan actuel</x-slot>
 
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h3 class="text-2xl font-bold text-gray-900 dark:text-white">
-                            {{ $this->currentPlan?->name ?? 'Freemium' }}
-                        </h3>
-                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                            @if ($this->subscriptionStatus === 'trialing')
-                                <x-filament::badge color="info">Essai gratuit</x-filament::badge>
-                            @elseif ($this->subscriptionStatus === 'active')
-                                <x-filament::badge color="success">Actif</x-filament::badge>
-                            @elseif ($this->subscriptionStatus === 'cancelling')
-                                <x-filament::badge color="warning">Annulation en cours</x-filament::badge>
-                            @elseif ($this->subscriptionStatus === 'paused')
-                                <x-filament::badge color="gray">En pause</x-filament::badge>
+        <div class="flex items-center justify-between">
+            <div>
+                <h3 class="text-2xl font-bold text-gray-900 dark:text-white">
+                    {{ $this->currentPlan?->name ?? 'Freemium' }}
+                </h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    @if ($this->subscriptionStatus === 'trialing')
+                        <x-filament::badge color="info">Essai gratuit</x-filament::badge>
+                    @elseif ($this->subscriptionStatus === 'active')
+                        <x-filament::badge color="success">Actif</x-filament::badge>
+                    @elseif ($this->subscriptionStatus === 'cancelling')
+                        <x-filament::badge color="warning">Annulation en cours</x-filament::badge>
+                    @elseif ($this->subscriptionStatus === 'paused')
+                        <x-filament::badge color="gray">En pause</x-filament::badge>
+                    @else
+                        <x-filament::badge color="gray">Gratuit</x-filament::badge>
+                    @endif
+                </p>
+            </div>
+
+            <div class="text-right">
+                <p class="text-3xl font-bold text-primary-600">
+                    {{ $this->currentPlan?->formatted_monthly_price ?? 'Gratuit' }}
+                </p>
+                <p class="text-sm text-gray-500">/mois</p>
+            </div>
+        </div>
+
+        @if ($this->subscriptionStatus === 'active')
+            <div class="mt-4 flex gap-2">
+                <x-filament::button color="warning" size="sm" wire:click="pauseSubscription">
+                    Mettre en pause
+                </x-filament::button>
+                <x-filament::button color="danger" size="sm" wire:click="cancelSubscription">
+                    Annuler
+                </x-filament::button>
+            </div>
+        @elseif ($this->subscriptionStatus === 'paused')
+            <div class="mt-4">
+                <x-filament::button color="success" size="sm" wire:click="resumeSubscription">
+                    Reprendre
+                </x-filament::button>
+            </div>
+        @elseif ($this->subscriptionStatus === 'cancelling')
+            <div class="mt-4">
+                <x-filament::button color="success" size="sm" wire:click="resumeSubscription">
+                    Reprendre l'abonnement
+                </x-filament::button>
+            </div>
+        @endif
+    </x-filament::section>
+
+    {{-- Usage Stats --}}
+    <x-filament::section>
+        <x-slot name="heading">Utilisation</x-slot>
+
+        <div class="usage-grid">
+            @foreach ($this->usageStats as $key => $stat)
+                <div style="padding: 0.4rem; border: 1px solid; border-radius: 0.5rem;" class="border-gray-200 dark:border-gray-700">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600 dark:text-gray-400">{{ $stat['label'] }}</span>
+                        <span class="font-medium text-gray-900 dark:text-white">
+                            @if ($stat['is_unlimited'])
+                                {{ $stat['current'] }} / &infin;
+                            @elseif ($stat['is_disabled'])
+                                Désactivé
                             @else
-                                <x-filament::badge color="gray">Gratuit</x-filament::badge>
+                                {{ $stat['current'] }} / {{ $stat['limit'] }}
                             @endif
-                        </p>
+                        </span>
                     </div>
-
-                    <div class="text-right">
-                        <p class="text-3xl font-bold text-primary-600">
-                            {{ $this->currentPlan?->formatted_monthly_price ?? 'Gratuit' }}
-                        </p>
-                        <p class="text-sm text-gray-500">/mois</p>
-                    </div>
-                </div>
-
-                @if ($this->subscriptionStatus === 'active')
-                    <div class="mt-4 flex gap-2">
-                        <x-filament::button color="warning" size="sm" wire:click="pauseSubscription">
-                            Mettre en pause
-                        </x-filament::button>
-                        <x-filament::button color="danger" size="sm" wire:click="cancelSubscription">
-                            Annuler
-                        </x-filament::button>
-                    </div>
-                @elseif ($this->subscriptionStatus === 'paused')
-                    <div class="mt-4">
-                        <x-filament::button color="success" size="sm" wire:click="resumeSubscription">
-                            Reprendre
-                        </x-filament::button>
-                    </div>
-                @elseif ($this->subscriptionStatus === 'cancelling')
-                    <div class="mt-4">
-                        <x-filament::button color="success" size="sm" wire:click="resumeSubscription">
-                            Reprendre l'abonnement
-                        </x-filament::button>
-                    </div>
-                @endif
-            </x-filament::section>
-        </div>
-
-        {{-- Quick Usage Stats --}}
-        <div>
-            <x-filament::section>
-                <x-slot name="heading">Utilisation</x-slot>
-
-                <div class="space-y-3">
-                    @foreach ($this->usageStats as $key => $stat)
-                        <div>
-                            <div class="flex justify-between text-sm mb-1">
-                                <span class="text-gray-600 dark:text-gray-400">{{ $stat['label'] }}</span>
-                                <span class="font-medium text-gray-900 dark:text-white">
-                                    @if ($stat['is_unlimited'])
-                                        {{ $stat['current'] }} / &infin;
-                                    @elseif ($stat['is_disabled'])
-                                        Désactivé
-                                    @else
-                                        {{ $stat['current'] }} / {{ $stat['limit'] }}
-                                    @endif
-                                </span>
+                    @unless ($stat['is_disabled'] || $stat['is_unlimited'])
+                        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                            <div class="h-2 rounded-full transition-all {{ $stat['percentage'] >= 90 ? 'bg-danger-500' : ($stat['percentage'] >= 70 ? 'bg-warning-500' : 'bg-primary-500') }}"
+                                 style="width: {{ $stat['percentage'] }}%">
                             </div>
-                            @unless ($stat['is_disabled'] || $stat['is_unlimited'])
-                                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                    <div class="h-2 rounded-full transition-all {{ $stat['percentage'] >= 90 ? 'bg-danger-500' : ($stat['percentage'] >= 70 ? 'bg-warning-500' : 'bg-primary-500') }}"
-                                         style="width: {{ $stat['percentage'] }}%">
-                                    </div>
-                                </div>
-                            @endunless
                         </div>
-                    @endforeach
+                    @endunless
                 </div>
-            </x-filament::section>
+            @endforeach
         </div>
-    </div>
+    </x-filament::section>
 
     {{-- Billing Cycle Toggle --}}
     <div class="flex justify-center my-6">

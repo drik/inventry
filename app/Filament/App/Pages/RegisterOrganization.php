@@ -29,7 +29,7 @@ class RegisterOrganization extends RegisterTenant
         $service = app(PlanLimitService::class);
 
         if (! $service->canCreateOrganization($user)) {
-            $tenant = Filament::getTenant();
+            $tenant = Filament::getTenant() ?? $user->organization;
 
             $notification = Notification::make()
                 ->title('Limite du plan atteinte')

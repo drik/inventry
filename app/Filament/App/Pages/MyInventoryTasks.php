@@ -14,9 +14,9 @@ class MyInventoryTasks extends Page
 
     protected static ?string $navigationGroup = 'Inventory';
 
-    protected static ?string $navigationLabel = 'My Tasks';
+    protected static ?string $navigationLabel = 'My Scan Tasks';
 
-    protected static ?string $title = 'My Inventory Tasks';
+    protected static ?string $title = 'My Inventory Scan Tasks';
 
     protected static ?int $navigationSort = 2;
 

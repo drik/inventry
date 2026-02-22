@@ -314,13 +314,13 @@
                 Mode Mobile
             </a>
 
-            {{-- Back to My Tasks --}}
+            {{-- Back to My Scan Tasks --}}
             <a
                 href="{{ route('filament.app.pages.my-inventory-tasks', ['tenant' => \Filament\Facades\Filament::getTenant()]) }}"
                 class="flex w-full items-center justify-center gap-2 rounded-xl bg-gray-200 px-4 py-3 font-medium text-gray-700 transition hover:bg-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
             >
                 <x-heroicon-o-arrow-left class="h-5 w-5" />
-                Back to My Tasks
+                Back to My Scan Tasks
             </a>
         </div>
     </div>

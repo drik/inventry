@@ -57,23 +57,40 @@ Les quotas IA sont gérés dynamiquement via le système de souscription existan
 - **Appels multiples** : nécessitent 3-4 appels séparés (labels + OCR + logos + matching) vs 1 seul appel LLM
 - **Pas de sortie personnalisable** : format de réponse fixe, impossible d'adapter au domaine
 
-### Architecture retenue : Multi-Provider avec fallback
+### Architecture retenue : Provider différencié par plan
+
+Le choix du provider IA dépend du plan de souscription de l'organisation :
+
+| Plan | Provider | Fallback | Qualité | Coût/requête |
+|------|----------|----------|---------|-------------|
+| **Freemium** | Gemini Flash uniquement | Aucun | Bonne | ~$0.002 |
+| **Basic** | Gemini Flash | GPT-4o si confiance < 0.5 | Bonne → Excellente | ~$0.002 à ~$0.015 |
+| **Pro** | Gemini Flash | GPT-4o si confiance < 0.5 | Bonne → Excellente | ~$0.002 à ~$0.015 |
+| **Premium** | GPT-4o directement | Gemini Flash si GPT-4o échoue | Excellente | ~$0.015 |
 
 ```
 Requête IA
     │
-    ├── Provider primaire : Google Gemini 2.5 Flash
-    │   → ~$0.002/requête, rapide (1-3s), bon rapport qualité/prix
-    │   → Utilisé pour 90%+ des requêtes
+    ├── Plan Freemium
+    │   └── Gemini Flash uniquement
+    │       → ~$0.002/requête, rapide (1-3s)
+    │       → Pas de fallback (coût minimal, 2 req/jour max)
     │
-    └── Fallback : OpenAI GPT-4o
-        → ~$0.015/requête, meilleure qualité
-        → Déclenché si :
-        │   • Gemini retourne une confiance < 0.5
-        │   • Gemini échoue (erreur API, timeout)
-        │   • L'utilisateur demande une "analyse approfondie"
-        └── Coût maîtrisé car usage limité (~10% des requêtes)
+    ├── Plan Basic / Pro
+    │   ├── Gemini Flash (primaire)
+    │   │   → ~$0.002/requête, bon rapport qualité/prix
+    │   └── Fallback GPT-4o si confiance < 0.5
+    │       → ~$0.015/requête, meilleure qualité
+    │       → Déclenché aussi si Gemini échoue (erreur API, timeout)
+    │
+    └── Plan Premium
+        ├── GPT-4o directement (primaire)
+        │   → ~$0.015/requête, qualité maximale garantie
+        └── Fallback Gemini Flash si GPT-4o échoue
+            → Assure la disponibilité du service
 ```
+
+**Justification** : Cette approche différencie la qualité de service par plan. Les utilisateurs Premium paient pour la meilleure expérience et reçoivent systématiquement les analyses GPT-4o (plus précises), avec fallback sur Gemini Flash en cas d'indisponibilité. Les plans Basic/Pro utilisent Gemini Flash (excellent rapport qualité/prix) avec un filet de sécurité GPT-4o pour les cas difficiles. Le plan Freemium reste sur Gemini seul pour maîtriser les coûts.
 
 ---
 
@@ -87,7 +104,7 @@ Requête IA
 1. L'agent appuie sur "Identifier par photo"
 2. L'écran de capture s'ouvre (vue caméra plein écran)
 3. L'agent prend une photo de l'objet
-4. La photo est envoyée au serveur → Gemini Flash analyse (fallback GPT-4o si confiance faible)
+4. La photo est envoyée au serveur → le provider est sélectionné selon le plan (Gemini Flash ou GPT-4o)
 5. Résultat affiché : catégorie suggérée, marque/modèle détectés, textes lus (numéros de série)
 
 ### Cas 2 : Correspondance avec les assets connus (`match`)
@@ -396,8 +413,11 @@ class AiVisionService
     // Vérification du quota via PlanLimitService
     public function canMakeRequest(Organization $org): bool;
 
-    // Sélection du provider
-    protected function getProvider(bool $forceHighQuality = false): VisionProviderInterface;
+    // Sélection du provider selon le plan
+    protected function getProvider(Organization $org): VisionProviderInterface;
+
+    // Vérifie si un fallback est nécessaire après analyse
+    protected function shouldFallback(Organization $org, array $result): bool;
 }
 ```
 
@@ -475,20 +495,72 @@ interface VisionProviderInterface
 - `app/Services/AiVision/OpenAiVisionProvider.php` — appels via `openai-php/laravel`
 - `app/Services/AiVisionService.php` — orchestrateur avec logique de fallback
 
-### Logique de fallback
+### Sélection du provider selon le plan
+
+```php
+protected function getProvider(Organization $org): VisionProviderInterface
+{
+    $plan = $this->planLimitService->getEffectivePlan($org);
+
+    // Premium → GPT-4o directement (qualité maximale)
+    if ($plan->slug === 'premium') {
+        return $this->openAiProvider;
+    }
+
+    // Freemium, Basic, Pro → Gemini Flash (primaire)
+    return $this->geminiProvider;
+}
+
+protected function shouldFallback(Organization $org, array $result): bool
+{
+    $plan = $this->planLimitService->getEffectivePlan($org);
+
+    // Freemium → jamais de fallback (coût minimal)
+    if ($plan->slug === 'freemium') {
+        return false;
+    }
+
+    // Premium → fallback sur Gemini uniquement si GPT-4o échoue (géré par try/catch)
+    // Basic / Pro → fallback GPT-4o si confiance faible
+    return $result['identification']['confidence'] < config('ai-vision.fallback_confidence_threshold');
+}
+
+protected function getFallbackProvider(Organization $org): VisionProviderInterface
+{
+    $plan = $this->planLimitService->getEffectivePlan($org);
+
+    // Premium : fallback = Gemini (le primaire des autres plans)
+    if ($plan->slug === 'premium') {
+        return $this->geminiProvider;
+    }
+
+    // Basic / Pro : fallback = GPT-4o
+    return $this->openAiProvider;
+}
+```
+
+### Logique de fallback dans `analyzePhoto()`
 
 ```php
 // Dans AiVisionService::analyzePhoto()
-$provider = $this->getProvider($forceHighQuality);
-$result = $provider->analyze($images, $prompt);
+$provider = $this->getProvider($organization);
 
-// Si le provider primaire (Gemini) retourne une confiance faible → fallback
-if (
-    !$forceHighQuality
-    && $provider->getProviderName() === config('ai-vision.primary_provider')
-    && $result['identification']['confidence'] < config('ai-vision.fallback_confidence_threshold')
-) {
-    $fallbackProvider = $this->getFallbackProvider();
+try {
+    $result = $provider->analyze($images, $prompt);
+} catch (\Exception $e) {
+    // Si le provider primaire échoue → fallback (sauf Freemium)
+    $plan = $this->planLimitService->getEffectivePlan($organization);
+    if ($plan->slug === 'freemium') {
+        throw $e;
+    }
+    $provider = $this->getFallbackProvider($organization);
+    $result = $provider->analyze($images, $prompt);
+    $usedFallback = true;
+}
+
+// Si confiance faible → tenter le fallback (Basic/Pro uniquement)
+if (!$usedFallback && $this->shouldFallback($organization, $result)) {
+    $fallbackProvider = $this->getFallbackProvider($organization);
     $result = $fallbackProvider->analyze($images, $prompt);
     $usedFallback = true;
 }
@@ -605,17 +677,18 @@ RateLimiter::for('ai-vision', function (Request $request) {
 
 4. **Validation de taille** : rejet des images > `max_image_size_kb` (2 Mo par défaut)
 
-### Estimation des coûts par plan (architecture multi-provider)
+### Estimation des coûts par plan (provider différencié)
 
-| Plan | Volume max/jour | Gemini Flash (90%) | GPT-4o fallback (10%) | **Coût mensuel max** |
-|------|----------------|--------------------|-----------------------|---------------------|
-| Freemium (2/jour) | 2 req | $0.11 | $0.09 | **~$0.20** |
-| Basic (5/jour) | 5 req | $0.27 | $0.23 | **~$0.50** |
-| Pro (50/jour) | 50 req | $2.70 | $2.25 | **~$5** |
-| Premium (illimité) | ~200 req | $10.80 | $9.00 | **~$20** |
+| Plan | Volume max/jour | Provider primaire | Fallback (~10% des req) | **Coût mensuel max** |
+|------|----------------|-------------------|------------------------|---------------------|
+| Freemium (2/jour) | 2 req | Gemini Flash : $0.12 | Aucun | **~$0.12** |
+| Basic (5/jour) | 5 req | Gemini Flash : $0.27 | GPT-4o : $0.23 | **~$0.50** |
+| Pro (50/jour) | 50 req | Gemini Flash : $2.70 | GPT-4o : $2.25 | **~$5** |
+| Premium (illimité, ~200/jour) | ~200 req | GPT-4o : $90 | Gemini Flash (erreur) : négligeable | **~$90** |
 
-(Basé sur ~$0.002/req Gemini Flash + ~$0.015/req GPT-4o, avec ratio 90/10)
-**Économie vs GPT-4o seul : ~78%**
+- Freemium : Gemini Flash uniquement → coût le plus bas possible
+- Basic / Pro : Gemini Flash + ~10% fallback GPT-4o → bon rapport qualité/prix
+- Premium : GPT-4o 100% → qualité maximale, coût absorbé par le prix du plan (250€/mois)
 
 **Coût vs revenus** : Même pour le plan Freemium, le coût IA (~$0.20/mois) est négligeable et sert d'appel pour convertir vers les plans payants.
 

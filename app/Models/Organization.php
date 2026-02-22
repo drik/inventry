@@ -9,10 +9,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Laravel\Paddle\Billable;
 
 class Organization extends Model implements HasCurrentTenantLabel
 {
-    use HasFactory, HasUlids, SoftDeletes;
+    use Billable, HasFactory, HasUlids, SoftDeletes;
 
     protected $fillable = [
         'name',
@@ -126,5 +127,15 @@ class Organization extends Model implements HasCurrentTenantLabel
     public function invitations(): HasMany
     {
         return $this->hasMany(Invitation::class);
+    }
+
+    public function plan(): BelongsTo
+    {
+        return $this->belongsTo(Plan::class);
+    }
+
+    public function aiUsageLogs(): HasMany
+    {
+        return $this->hasMany(AiUsageLog::class);
     }
 }

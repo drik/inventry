@@ -12,7 +12,13 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->alias([
+            'plan.limit' => \App\Http\Middleware\CheckPlanLimit::class,
+        ]);
+
+        $middleware->validateCsrfTokens(except: [
+            'paddle/*',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

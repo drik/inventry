@@ -39,6 +39,10 @@ class AppPanelProvider extends PanelProvider
                 PanelsRenderHook::BODY_END,
                 fn (): string => Blade::render('@livewire(\'notification-alert-manager\')'),
             )
+            ->renderHook(
+                PanelsRenderHook::HEAD_END,
+                fn (): string => Blade::render('@paddleJS'),
+            )
             ->brandLogo(asset('images/logo.png'))
             ->darkModeBrandLogo(asset('images/logo_white.png'))
             ->brandLogoHeight('4rem')
@@ -55,6 +59,7 @@ class AppPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/App/Widgets'), for: 'App\\Filament\\App\\Widgets')
             ->widgets([
+                \App\Filament\Widgets\PlanUsageWidget::class,
                 \App\Filament\Widgets\StatsOverview::class,
                 \App\Filament\Widgets\AssetsByStatusChart::class,
                 \App\Filament\Widgets\AssetsByCategoryChart::class,

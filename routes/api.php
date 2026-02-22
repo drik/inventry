@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\SyncController;
 use App\Http\Controllers\Api\TaskController;
 use Illuminate\Support\Facades\Route;
@@ -18,12 +19,17 @@ Route::middleware('auth:sanctum')->group(function () {
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index']);
 
+    // Subscription
+    Route::get('/subscription/current', [SubscriptionController::class, 'current']);
+    Route::get('/subscription/plans', [SubscriptionController::class, 'plans']);
+    Route::get('/subscription/usage', [SubscriptionController::class, 'usage']);
+
     // Tasks
     Route::get('/tasks', [TaskController::class, 'index']);
     Route::get('/tasks/{taskId}/download', [TaskController::class, 'download']);
     Route::post('/tasks/{taskId}/start', [TaskController::class, 'start']);
     Route::post('/tasks/{taskId}/complete', [TaskController::class, 'complete']);
-    Route::post('/tasks/{taskId}/scan', [TaskController::class, 'scan']);
+    Route::post('/tasks/{taskId}/scan', [TaskController::class, 'scan'])->middleware('plan.limit:max_assets');
     Route::post('/tasks/{taskId}/unexpected', [TaskController::class, 'unexpected']);
 
     // Sync

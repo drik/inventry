@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AiVisionController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\SubscriptionController;
@@ -31,6 +32,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/tasks/{taskId}/complete', [TaskController::class, 'complete']);
     Route::post('/tasks/{taskId}/scan', [TaskController::class, 'scan'])->middleware('plan.limit:max_assets');
     Route::post('/tasks/{taskId}/unexpected', [TaskController::class, 'unexpected']);
+
+    // AI Vision
+    Route::post('/tasks/{taskId}/ai-identify', [AiVisionController::class, 'identify'])
+        ->middleware(['throttle:ai-vision', 'plan.limit:max_ai_requests_daily']);
+    Route::post('/tasks/{taskId}/ai-verify', [AiVisionController::class, 'verify'])
+        ->middleware(['throttle:ai-vision', 'plan.limit:max_ai_requests_daily']);
+    Route::post('/tasks/{taskId}/ai-confirm', [AiVisionController::class, 'confirm']);
 
     // Sync
     Route::post('/tasks/{taskId}/sync', [SyncController::class, 'sync']);

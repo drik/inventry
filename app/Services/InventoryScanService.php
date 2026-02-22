@@ -92,6 +92,9 @@ class InventoryScanService
         InventoryTask $task,
         string $userId,
         ?string $conditionNotes = null,
+        string $identificationMethod = 'barcode',
+        ?string $aiRecognitionLogId = null,
+        ?float $aiConfidence = null,
     ): ?InventoryItem {
         $exists = $session->items()->where('asset_id', $asset->id)->exists();
 
@@ -107,6 +110,9 @@ class InventoryScanService
             'scanned_at' => now(),
             'scanned_by' => $userId,
             'condition_notes' => $conditionNotes,
+            'identification_method' => $identificationMethod,
+            'ai_recognition_log_id' => $aiRecognitionLogId,
+            'ai_confidence' => $aiConfidence,
         ]);
 
         $this->refreshSessionCounters($session);
@@ -117,13 +123,22 @@ class InventoryScanService
     /**
      * Mark an item as found.
      */
-    public function markItemFound(InventoryItem $item, InventoryTask $task, string $userId): void
-    {
+    public function markItemFound(
+        InventoryItem $item,
+        InventoryTask $task,
+        string $userId,
+        string $identificationMethod = 'barcode',
+        ?string $aiRecognitionLogId = null,
+        ?float $aiConfidence = null,
+    ): void {
         $item->update([
             'status' => InventoryItemStatus::Found,
             'scanned_at' => now(),
             'scanned_by' => $userId,
             'task_id' => $task->id,
+            'identification_method' => $identificationMethod,
+            'ai_recognition_log_id' => $aiRecognitionLogId,
+            'ai_confidence' => $aiConfidence,
         ]);
 
         $this->refreshSessionCounters($item->session);

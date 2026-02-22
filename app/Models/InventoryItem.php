@@ -22,6 +22,9 @@ class InventoryItem extends Model
         'scanned_at',
         'scanned_by',
         'condition_notes',
+        'identification_method',
+        'ai_recognition_log_id',
+        'ai_confidence',
     ];
 
     protected function casts(): array
@@ -29,6 +32,7 @@ class InventoryItem extends Model
         return [
             'status' => InventoryItemStatus::class,
             'scanned_at' => 'datetime',
+            'ai_confidence' => 'decimal:4',
         ];
     }
 
@@ -52,5 +56,10 @@ class InventoryItem extends Model
     public function scanner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'scanned_by');
+    }
+
+    public function aiRecognitionLog(): BelongsTo
+    {
+        return $this->belongsTo(AiRecognitionLog::class);
     }
 }

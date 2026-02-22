@@ -31,6 +31,8 @@ class PlanUsageWidget extends Widget
             PlanFeature::MaxUsers,
             PlanFeature::MaxLocations,
             PlanFeature::MaxActiveInventorySessions,
+            PlanFeature::MaxAiRequestsDaily,
+            PlanFeature::MaxAiRequestsMonthly,
         ];
 
         $data = [];
@@ -48,6 +50,8 @@ class PlanUsageWidget extends Widget
                     PlanFeature::MaxUsers => 'heroicon-o-users',
                     PlanFeature::MaxLocations => 'heroicon-o-map-pin',
                     PlanFeature::MaxActiveInventorySessions => 'heroicon-o-clipboard-document-list',
+                    PlanFeature::MaxAiRequestsDaily => 'heroicon-o-sparkles',
+                    PlanFeature::MaxAiRequestsMonthly => 'heroicon-o-cpu-chip',
                     default => 'heroicon-o-chart-bar',
                 },
             ];

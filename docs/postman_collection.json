@@ -19,6 +19,16 @@
       "key": "task_id",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "asset_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "recognition_log_id",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
@@ -174,6 +184,120 @@
         }
       ],
       "description": "Tableau de bord et statistiques"
+    },
+    {
+      "name": "Subscription",
+      "item": [
+        {
+          "name": "Current Subscription",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Subscription info returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('plan');",
+                  "    pm.expect(jsonData.plan).to.have.property('name');",
+                  "    pm.expect(jsonData.plan).to.have.property('slug');",
+                  "    pm.expect(jsonData).to.have.property('subscription');",
+                  "    pm.expect(jsonData.subscription).to.have.property('is_subscribed');",
+                  "    pm.expect(jsonData.subscription).to.have.property('status');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/subscription/current",
+              "host": ["{{base_url}}"],
+              "path": ["subscription", "current"]
+            },
+            "description": "Informations sur l'abonnement actuel de l'organisation :\n- plan : nom, slug, prix mensuel/annuel\n- subscription : statut (active, trialing, free), période d'essai"
+          }
+        },
+        {
+          "name": "List Plans",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Plans list returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('plans');",
+                  "    pm.expect(jsonData.plans).to.be.an('array');",
+                  "    if (jsonData.plans.length > 0) {",
+                  "        pm.expect(jsonData.plans[0]).to.have.property('name');",
+                  "        pm.expect(jsonData.plans[0]).to.have.property('limits');",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/subscription/plans",
+              "host": ["{{base_url}}"],
+              "path": ["subscription", "plans"]
+            },
+            "description": "Liste de tous les plans disponibles avec leurs limites et tarifs.\n\nPlans : Freemium (0€), Basic (5€), Pro (35€), Premium (250€)"
+          }
+        },
+        {
+          "name": "Usage Stats",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Usage stats returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('usage');",
+                  "    pm.expect(jsonData).to.have.property('features');",
+                  "    pm.expect(jsonData.usage).to.have.property('max_users');",
+                  "    pm.expect(jsonData.usage).to.have.property('max_assets');",
+                  "    pm.expect(jsonData.usage).to.have.property('max_ai_requests_daily');",
+                  "    pm.expect(jsonData.usage).to.have.property('max_ai_requests_monthly');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/subscription/usage",
+              "host": ["{{base_url}}"],
+              "path": ["subscription", "usage"]
+            },
+            "description": "Utilisation des quotas de l'organisation :\n- usage : utilisateurs, assets, emplacements, sessions actives, requêtes IA (jour/mois)\n- features : fonctionnalités booléennes (API, export, analytics, intégrations, support prioritaire)"
+          }
+        }
+      ],
+      "description": "Abonnement et gestion des plans"
     },
     {
       "name": "Tasks",
@@ -376,6 +500,215 @@
       "description": "Gestion des tâches d'inventaire"
     },
     {
+      "name": "AI Vision",
+      "item": [
+        {
+          "name": "AI Identify",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var status = pm.response.code;",
+                  "if (status === 200) {",
+                  "    pm.test('AI identification returned', function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData).to.have.property('recognition_log_id');",
+                  "        pm.expect(jsonData).to.have.property('identification');",
+                  "        pm.expect(jsonData).to.have.property('matches');",
+                  "        pm.expect(jsonData).to.have.property('has_strong_match');",
+                  "        pm.expect(jsonData).to.have.property('usage');",
+                  "        pm.collectionVariables.set('recognition_log_id', jsonData.recognition_log_id);",
+                  "        console.log('recognition_log_id saved:', jsonData.recognition_log_id);",
+                  "        if (jsonData.matches.length > 0) {",
+                  "            pm.collectionVariables.set('asset_id', jsonData.matches[0].asset_id);",
+                  "            console.log('Best match asset_id saved:', jsonData.matches[0].asset_id);",
+                  "        }",
+                  "    });",
+                  "} else if (status === 403) {",
+                  "    pm.test('Quota exceeded', function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData).to.have.property('error');",
+                  "        pm.expect(jsonData.error).to.eql('plan_limit_reached');",
+                  "    });",
+                  "} else if (status === 503) {",
+                  "    pm.test('AI Vision disabled', function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData).to.have.property('message');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "photo",
+                  "type": "file",
+                  "src": "",
+                  "description": "Photo de l'asset à identifier (JPEG/PNG, max 2048 Ko)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/ai-identify",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "ai-identify"]
+            },
+            "description": "Identifie un asset à partir d'une photo.\n\nL'IA analyse la photo, identifie la catégorie/marque/modèle, et cherche des correspondances parmi les assets de l'organisation.\n\n**Middlewares :**\n- throttle:ai-vision (10 req/min par org)\n- plan.limit:max_ai_requests_daily\n- Vérification quota mensuel dans le contrôleur\n\n**Providers :** Gemini Flash (Freemium/Basic/Pro) ou GPT-4o (Premium) avec fallback automatique.\n\nLe `recognition_log_id` et le meilleur `asset_id` sont automatiquement sauvegardés pour les requêtes suivantes."
+          }
+        },
+        {
+          "name": "AI Verify",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var status = pm.response.code;",
+                  "if (status === 200) {",
+                  "    pm.test('AI verification returned', function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData).to.have.property('recognition_log_id');",
+                  "        pm.expect(jsonData).to.have.property('is_match');",
+                  "        pm.expect(jsonData).to.have.property('confidence');",
+                  "        pm.expect(jsonData).to.have.property('reasoning');",
+                  "        pm.expect(jsonData).to.have.property('discrepancies');",
+                  "        pm.expect(jsonData).to.have.property('usage');",
+                  "        pm.collectionVariables.set('recognition_log_id', jsonData.recognition_log_id);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "photo",
+                  "type": "file",
+                  "src": "",
+                  "description": "Photo de l'asset à vérifier (JPEG/PNG, max 2048 Ko)"
+                },
+                {
+                  "key": "asset_id",
+                  "value": "{{asset_id}}",
+                  "type": "text",
+                  "description": "ID de l'asset à comparer"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/ai-verify",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "ai-verify"]
+            },
+            "description": "Vérifie qu'une photo correspond bien à un asset spécifique.\n\nCompare la photo capturée avec les images de référence de l'asset et ses métadonnées.\n\nRetourne un score de confiance, un raisonnement et la liste des divergences détectées."
+          }
+        },
+        {
+          "name": "AI Confirm (matched)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('AI confirmation returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('action');",
+                  "    pm.expect(jsonData.action).to.eql('matched');",
+                  "    pm.expect(jsonData).to.have.property('item');",
+                  "    pm.expect(jsonData.item).to.have.property('identification_method');",
+                  "    pm.expect(jsonData.item.identification_method).to.eql('ai_vision');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recognition_log_id\": \"{{recognition_log_id}}\",\n  \"asset_id\": \"{{asset_id}}\",\n  \"action\": \"matched\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/ai-confirm",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "ai-confirm"]
+            },
+            "description": "Confirme une suggestion IA : l'utilisateur accepte que l'asset identifié correspond.\n\nL'item est marqué comme Found avec `identification_method: ai_vision`.\n\nSi l'asset n'est pas dans la session, il est ajouté automatiquement.\n\nNe consomme pas de requête IA (pas de middleware de quota)."
+          }
+        },
+        {
+          "name": "AI Confirm (unexpected)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recognition_log_id\": \"{{recognition_log_id}}\",\n  \"asset_id\": \"{{asset_id}}\",\n  \"action\": \"unexpected\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/ai-confirm",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "ai-confirm"]
+            },
+            "description": "Confirme une suggestion IA en marquant l'asset comme inattendu.\n\nL'item est créé avec le statut `unexpected` et `identification_method: ai_vision`.\n\nRetourne 201 si créé, 422 si l'asset est déjà dans la session."
+          }
+        },
+        {
+          "name": "AI Confirm (dismissed)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recognition_log_id\": \"{{recognition_log_id}}\",\n  \"action\": \"dismissed\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/ai-confirm",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "ai-confirm"]
+            },
+            "description": "Rejette une suggestion IA. Aucune action n'est effectuée sur l'inventaire.\n\nNote : `asset_id` n'est pas requis pour l'action `dismissed`."
+          }
+        }
+      ],
+      "description": "Reconnaissance d'assets par intelligence artificielle.\n\nProviders : Gemini Flash (Freemium/Basic/Pro), GPT-4o (Premium).\nFallback automatique si confiance < 0.5 (Basic/Pro).\n\nFlux typique :\n1. AI Identify → obtenir suggestions\n2. AI Confirm (matched/unexpected/dismissed) → valider ou rejeter"
+    },
+    {
       "name": "Sync",
       "item": [
         {
@@ -407,14 +740,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"scans\": [\n    {\n      \"item_id\": \"REPLACE_WITH_ITEM_ID\",\n      \"status\": \"found\",\n      \"scanned_at\": \"2026-02-20T10:35:00Z\",\n      \"condition_notes\": null\n    }\n  ],\n  \"task_status\": \"in_progress\",\n  \"task_notes\": \"Zone A en cours\",\n  \"last_synced_at\": \"2026-02-20T10:00:00Z\"\n}"
+              "raw": "{\n  \"scans\": [\n    {\n      \"item_id\": \"REPLACE_WITH_ITEM_ID\",\n      \"status\": \"found\",\n      \"scanned_at\": \"2026-02-20T10:35:00Z\",\n      \"condition_notes\": null,\n      \"identification_method\": \"barcode\"\n    }\n  ],\n  \"task_status\": \"in_progress\",\n  \"task_notes\": \"Zone A en cours\",\n  \"last_synced_at\": \"2026-02-20T10:00:00Z\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/tasks/{{task_id}}/sync",
               "host": ["{{base_url}}"],
               "path": ["tasks", "{{task_id}}", "sync"]
             },
-            "description": "Synchronisation des scans effectués hors ligne.\n\nChaque scan peut être :\n- **item_id + status** : met à jour un item existant (found)\n- **asset_id + status** (item_id=null) : crée un item unexpected\n\n**Gestion des conflits** : si un item a déjà été scanné par un autre utilisateur avec un `scanned_at` plus récent, le scan mobile est ignoré et retourné dans `conflicts`.\n\nLe champ `task_status` peut être `in_progress` ou `completed`.\nSi `completed`, la tâche est terminée et les notifications sont envoyées."
+            "description": "Synchronisation des scans effectués hors ligne.\n\nChaque scan peut être :\n- **item_id + status** : met à jour un item existant (found)\n- **asset_id + status** (item_id=null) : crée un item unexpected\n\nChamps optionnels par scan :\n- `identification_method` : barcode (défaut), nfc, ai_vision, manual\n- `ai_recognition_log_id` : ID du log AI (si identifié par IA)\n- `ai_confidence` : score de confiance IA (0-1)\n\n**Gestion des conflits** : si un item a déjà été scanné par un autre utilisateur avec un `scanned_at` plus récent, le scan mobile est ignoré et retourné dans `conflicts`.\n\nLa réponse inclut tous les items avec leurs champs AI (`identification_method`, `ai_recognition_log_id`, `ai_confidence`)."
           }
         },
         {
@@ -428,7 +761,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"scans\": [\n    {\n      \"item_id\": null,\n      \"asset_id\": \"REPLACE_WITH_ASSET_ID\",\n      \"status\": \"unexpected\",\n      \"scanned_at\": \"2026-02-20T10:36:00Z\",\n      \"condition_notes\": \"Trouvé hors emplacement\"\n    }\n  ],\n  \"task_status\": \"in_progress\",\n  \"task_notes\": null,\n  \"last_synced_at\": \"2026-02-20T10:30:00Z\"\n}"
+              "raw": "{\n  \"scans\": [\n    {\n      \"item_id\": null,\n      \"asset_id\": \"REPLACE_WITH_ASSET_ID\",\n      \"status\": \"unexpected\",\n      \"scanned_at\": \"2026-02-20T10:36:00Z\",\n      \"condition_notes\": \"Trouvé hors emplacement\",\n      \"identification_method\": \"barcode\"\n    }\n  ],\n  \"task_status\": \"in_progress\",\n  \"task_notes\": null,\n  \"last_synced_at\": \"2026-02-20T10:30:00Z\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/tasks/{{task_id}}/sync",
@@ -436,6 +769,27 @@
               "path": ["tasks", "{{task_id}}", "sync"]
             },
             "description": "Exemple de sync avec un asset inattendu.\n\nQuand `item_id` est null et `asset_id` est fourni, un nouvel InventoryItem est créé avec le statut `unexpected`."
+          }
+        },
+        {
+          "name": "Sync (with AI Vision scan)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scans\": [\n    {\n      \"item_id\": \"REPLACE_WITH_ITEM_ID\",\n      \"status\": \"found\",\n      \"scanned_at\": \"2026-02-20T10:37:00Z\",\n      \"condition_notes\": \"Identifié par IA\",\n      \"identification_method\": \"ai_vision\",\n      \"ai_recognition_log_id\": \"REPLACE_WITH_LOG_ID\",\n      \"ai_confidence\": 0.88\n    }\n  ],\n  \"task_status\": \"in_progress\",\n  \"task_notes\": null,\n  \"last_synced_at\": \"2026-02-20T10:30:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/sync",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "sync"]
+            },
+            "description": "Exemple de sync avec un scan effectué par AI Vision.\n\nLes champs `identification_method`, `ai_recognition_log_id` et `ai_confidence` permettent de tracer l'origine de l'identification."
           }
         },
         {

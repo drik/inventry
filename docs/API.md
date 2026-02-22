@@ -236,11 +236,297 @@ curl -X POST http://localhost:8000/api/tasks/{taskId}/unexpected \
 
 ---
 
+## Abonnement
+
+### `GET /api/subscription/current`
+
+Informations sur l'abonnement de l'organisation.
+
+```bash
+curl http://localhost:8000/api/subscription/current \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json"
+```
+
+**Réponse 200 :**
+```json
+{
+  "plan": {
+    "id": "01HX...",
+    "name": "Pro",
+    "slug": "pro",
+    "price_monthly": "35.00",
+    "price_yearly": "350.00"
+  },
+  "subscription": {
+    "is_subscribed": true,
+    "on_trial": false,
+    "trial_ends_at": null,
+    "status": "active"
+  }
+}
+```
+
+### `GET /api/subscription/plans`
+
+Liste de tous les plans disponibles.
+
+```bash
+curl http://localhost:8000/api/subscription/plans \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json"
+```
+
+**Réponse 200 :**
+```json
+{
+  "plans": [
+    {
+      "id": "01HX...",
+      "name": "Freemium",
+      "slug": "freemium",
+      "description": "...",
+      "price_monthly": "0.00",
+      "price_yearly": "0.00",
+      "formatted_monthly_price": "0 €",
+      "formatted_yearly_price": "0 €",
+      "limits": {
+        "max_users": 2,
+        "max_assets": 50,
+        "max_ai_requests_daily": 3,
+        "max_ai_requests_monthly": 30
+      }
+    }
+  ]
+}
+```
+
+### `GET /api/subscription/usage`
+
+Utilisation des quotas et fonctionnalités de l'organisation.
+
+```bash
+curl http://localhost:8000/api/subscription/usage \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json"
+```
+
+**Réponse 200 :**
+```json
+{
+  "usage": {
+    "max_users": { "label": "Utilisateurs", "current": 3, "limit": 10, "percentage": 30, "is_unlimited": false, "is_disabled": false },
+    "max_assets": { "label": "Assets", "current": 45, "limit": 500, "percentage": 9, "is_unlimited": false, "is_disabled": false },
+    "max_locations": { "label": "Emplacements", "current": 2, "limit": 20, "percentage": 10, "is_unlimited": false, "is_disabled": false },
+    "max_active_inventory_sessions": { "label": "Sessions actives", "current": 1, "limit": 5, "percentage": 20, "is_unlimited": false, "is_disabled": false },
+    "max_ai_requests_daily": { "label": "Requêtes IA (jour)", "current": 5, "limit": 30, "percentage": 16, "is_unlimited": false, "is_disabled": false },
+    "max_ai_requests_monthly": { "label": "Requêtes IA (mois)", "current": 42, "limit": 500, "percentage": 8, "is_unlimited": false, "is_disabled": false }
+  },
+  "features": {
+    "has_api_access": { "label": "Accès API", "enabled": true },
+    "has_export": { "label": "Export", "enabled": true },
+    "has_advanced_analytics": { "label": "Analytiques avancées", "enabled": false },
+    "has_custom_integrations": { "label": "Intégrations personnalisées", "enabled": false },
+    "has_priority_support": { "label": "Support prioritaire", "enabled": false }
+  }
+}
+```
+
+---
+
+## AI Vision
+
+Reconnaissance d'assets par intelligence artificielle. Utilise Gemini Flash (Freemium/Basic/Pro) ou GPT-4o (Premium) avec fallback automatique.
+
+**Middlewares :**
+- `throttle:ai-vision` — 10 requêtes/minute par organisation (anti-abus)
+- `plan.limit:max_ai_requests_daily` — quota journalier selon le plan
+- Vérification quota mensuel dans le contrôleur
+
+### `POST /api/tasks/{taskId}/ai-identify`
+
+Identifie un asset à partir d'une photo et cherche des correspondances parmi les assets de l'organisation.
+
+```bash
+curl -X POST http://localhost:8000/api/tasks/{taskId}/ai-identify \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json" \
+  -F "photo=@/path/to/photo.jpg"
+```
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `photo` | file | Image JPEG/PNG, max 2048 Ko |
+
+**Réponse 200 :**
+```json
+{
+  "recognition_log_id": "01HX...",
+  "identification": {
+    "suggested_category": "Ordinateurs portables",
+    "suggested_brand": "Apple",
+    "suggested_model": "MacBook Pro 14\"",
+    "detected_text": ["FVFXJ3K1Q6LR", "MacBook Pro"],
+    "confidence": 0.92,
+    "description": "Ordinateur portable argenté avec logo Apple"
+  },
+  "matches": [
+    {
+      "asset_id": "01HX...",
+      "asset_name": "MacBook Pro 14\" - Marie",
+      "asset_code": "AST-00042",
+      "category_name": "Ordinateurs portables",
+      "location_name": "Siège - Lomé",
+      "primary_image_url": "http://localhost:8000/storage/...",
+      "confidence": 0.88,
+      "reasoning": "Même modèle, numéro de série visible correspond",
+      "inventory_status": "pending"
+    }
+  ],
+  "has_strong_match": true,
+  "usage": {
+    "daily_used": 5,
+    "daily_limit": 30,
+    "monthly_used": 42,
+    "monthly_limit": 500
+  }
+}
+```
+
+`inventory_status` peut être : `pending`, `found`, `missing`, `unexpected`, ou `not_in_session`.
+
+**Erreur 403 :** Quota mensuel atteint.
+
+**Erreur 429 :** Rate limit (trop de requêtes par minute).
+
+**Erreur 503 :** AI Vision désactivée (`AI_VISION_ENABLED=false`).
+
+### `POST /api/tasks/{taskId}/ai-verify`
+
+Vérifie qu'une photo correspond bien à un asset spécifique.
+
+```bash
+curl -X POST http://localhost:8000/api/tasks/{taskId}/ai-verify \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json" \
+  -F "photo=@/path/to/photo.jpg" \
+  -F "asset_id=01HX..."
+```
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `photo` | file | Image JPEG/PNG, max 2048 Ko |
+| `asset_id` | string | ID de l'asset à vérifier |
+
+**Réponse 200 :**
+```json
+{
+  "recognition_log_id": "01HX...",
+  "is_match": true,
+  "confidence": 0.95,
+  "reasoning": "Le modèle, la couleur et le numéro de série correspondent à l'asset de référence.",
+  "discrepancies": [],
+  "usage": {
+    "daily_used": 6,
+    "daily_limit": 30,
+    "monthly_used": 43,
+    "monthly_limit": 500
+  }
+}
+```
+
+**Réponse 200 (non-correspondance) :**
+```json
+{
+  "recognition_log_id": "01HX...",
+  "is_match": false,
+  "confidence": 0.30,
+  "reasoning": "La couleur et le modèle ne correspondent pas.",
+  "discrepancies": ["Couleur différente (noir vs argenté)", "Modèle différent"],
+  "usage": { "..." }
+}
+```
+
+**Erreurs :** Mêmes que `ai-identify` (403, 429, 503).
+
+### `POST /api/tasks/{taskId}/ai-confirm`
+
+Confirme ou rejette une suggestion IA. Pas de middleware de quota (ne consomme pas de requête IA).
+
+```bash
+curl -X POST http://localhost:8000/api/tasks/{taskId}/ai-confirm \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json" \
+  -d '{
+    "recognition_log_id": "01HX...",
+    "asset_id": "01HX...",
+    "action": "matched"
+  }'
+```
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `recognition_log_id` | string | ID du log de reconnaissance |
+| `asset_id` | string | ID de l'asset (requis sauf si `action=dismissed`) |
+| `action` | string | `matched`, `unexpected`, ou `dismissed` |
+
+**Réponse 200 (`matched`) :**
+```json
+{
+  "action": "matched",
+  "item": {
+    "id": "01HX...",
+    "asset_id": "01HX...",
+    "status": "found",
+    "scanned_at": "2026-02-21T10:35:00+00:00",
+    "identification_method": "ai_vision"
+  }
+}
+```
+
+**Réponse 201 (`unexpected`) :**
+```json
+{
+  "action": "unexpected",
+  "item": {
+    "id": "01HX...",
+    "asset_id": "01HX...",
+    "status": "unexpected",
+    "scanned_at": "2026-02-21T10:35:00+00:00",
+    "identification_method": "ai_vision"
+  }
+}
+```
+
+**Réponse 200 (`dismissed`) :**
+```json
+{
+  "action": "dismissed",
+  "message": "Suggestion IA annulée."
+}
+```
+
+**Erreur 422 :** Asset déjà dans la session (pour `unexpected`).
+
+---
+
 ## Synchronisation
 
 ### `POST /api/tasks/{taskId}/sync`
 
 Envoie les scans offline et reçoit l'état à jour.
+
+| Champ scan | Type | Description |
+|------------|------|-------------|
+| `item_id` | string\|null | ID de l'item existant (null pour unexpected) |
+| `asset_id` | string\|null | ID de l'asset (requis si item_id est null) |
+| `status` | string | `found` ou `unexpected` |
+| `scanned_at` | datetime | Date/heure du scan (ISO 8601) |
+| `condition_notes` | string\|null | Notes sur l'état |
+| `identification_method` | string\|null | `barcode`, `nfc`, `ai_vision`, ou `manual` (défaut: `barcode`) |
+| `ai_recognition_log_id` | string\|null | ID du log AI (si identifié par IA) |
+| `ai_confidence` | float\|null | Score de confiance IA entre 0 et 1 |
 
 ```bash
 curl -X POST http://localhost:8000/api/tasks/{taskId}/sync \
@@ -253,14 +539,18 @@ curl -X POST http://localhost:8000/api/tasks/{taskId}/sync \
         "item_id": "01HX...",
         "status": "found",
         "scanned_at": "2026-02-20T10:35:00Z",
-        "condition_notes": null
+        "condition_notes": null,
+        "identification_method": "barcode"
       },
       {
         "item_id": null,
         "asset_id": "01HX...",
         "status": "unexpected",
         "scanned_at": "2026-02-20T10:36:00Z",
-        "condition_notes": "Hors emplacement"
+        "condition_notes": "Identifié par IA",
+        "identification_method": "ai_vision",
+        "ai_recognition_log_id": "01HX...",
+        "ai_confidence": 0.88
       }
     ],
     "task_status": "in_progress",
@@ -275,7 +565,19 @@ curl -X POST http://localhost:8000/api/tasks/{taskId}/sync \
   "synced_count": 2,
   "conflicts": [],
   "task": { "id": "01HX...", "status": "in_progress" },
-  "items": [ ... ],
+  "items": [
+    {
+      "id": "01HX...",
+      "asset_id": "01HX...",
+      "status": "found",
+      "scanned_at": "2026-02-20T10:35:00+00:00",
+      "scanned_by": "01HX...",
+      "condition_notes": null,
+      "identification_method": "barcode",
+      "ai_recognition_log_id": null,
+      "ai_confidence": null
+    }
+  ],
   "synced_at": "2026-02-20T10:40:00+00:00"
 }
 ```
@@ -320,9 +622,11 @@ curl "http://localhost:8000/api/tasks/{taskId}/sync-status?since=2026-02-20T10:0
 | Code | Description |
 |------|-------------|
 | 401 | Token invalide ou expiré |
-| 403 | Tâche non assignée à l'utilisateur |
+| 403 | Tâche non assignée à l'utilisateur ou quota de plan atteint |
 | 404 | Ressource non trouvée |
 | 422 | Données invalides ou action impossible |
+| 429 | Rate limit atteint (trop de requêtes par minute) |
+| 503 | Fonctionnalité désactivée (ex: AI Vision) |
 
 Toutes les erreurs retournent un JSON avec un champ `message`.
 

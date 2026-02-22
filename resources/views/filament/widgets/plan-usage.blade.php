@@ -12,12 +12,17 @@
             </div>
         </x-slot>
 
-        <div class="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-4">
+        <style>
+            .plan-usage-grid { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+            @media (min-width: 640px) { .plan-usage-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+            @media (min-width: 1024px) { .plan-usage-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+        </style>
+        <div class="plan-usage-grid grid gap-4">
             @foreach ($data['features'] as $feature)
                 <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
                     <div class="flex items-center gap-2 mb-2">
-                        <x-filament::icon :icon="$feature['icon']" class="h-5 w-5 text-gray-400" />
-                        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ $feature['label'] }}</span>
+                        <x-filament::icon :icon="$feature['icon']" class="h-5 w-5 shrink-0 text-gray-400" />
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-300 truncate" title="{{ $feature['label'] }}">{{ $feature['label'] }}</span>
                     </div>
 
                     <div class="flex items-baseline gap-1 mb-2">

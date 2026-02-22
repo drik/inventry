@@ -26,6 +26,9 @@ class SyncController extends Controller
             'scans.*.status' => 'required|string|in:found,unexpected',
             'scans.*.scanned_at' => 'required|date',
             'scans.*.condition_notes' => 'nullable|string',
+            'scans.*.identification_method' => 'nullable|string|in:barcode,nfc,ai_vision,manual',
+            'scans.*.ai_recognition_log_id' => 'nullable|string',
+            'scans.*.ai_confidence' => 'nullable|numeric|between:0,1',
             'task_status' => 'nullable|string|in:pending,in_progress,completed',
             'task_notes' => 'nullable|string',
             'last_synced_at' => 'nullable|date',
@@ -69,6 +72,9 @@ class SyncController extends Controller
                     'scanned_by' => $userId,
                     'task_id' => $task->id,
                     'condition_notes' => $scan['condition_notes'] ?? $item->condition_notes,
+                    'identification_method' => $scan['identification_method'] ?? $item->identification_method ?? 'barcode',
+                    'ai_recognition_log_id' => $scan['ai_recognition_log_id'] ?? $item->ai_recognition_log_id,
+                    'ai_confidence' => $scan['ai_confidence'] ?? $item->ai_confidence,
                 ]);
                 $syncedCount++;
             } elseif (! empty($scan['asset_id'])) {
@@ -86,6 +92,9 @@ class SyncController extends Controller
                         'scanned_at' => Carbon::parse($scan['scanned_at']),
                         'scanned_by' => $userId,
                         'condition_notes' => $scan['condition_notes'] ?? null,
+                        'identification_method' => $scan['identification_method'] ?? 'barcode',
+                        'ai_recognition_log_id' => $scan['ai_recognition_log_id'] ?? null,
+                        'ai_confidence' => $scan['ai_confidence'] ?? null,
                     ]);
                     $syncedCount++;
                 }
@@ -132,6 +141,9 @@ class SyncController extends Controller
                 'scanned_at' => $item->scanned_at?->toIso8601String(),
                 'scanned_by' => $item->scanned_by,
                 'condition_notes' => $item->condition_notes,
+                'identification_method' => $item->identification_method ?? 'barcode',
+                'ai_recognition_log_id' => $item->ai_recognition_log_id,
+                'ai_confidence' => $item->ai_confidence,
             ]),
             'synced_at' => now()->toIso8601String(),
         ]);

@@ -10,11 +10,14 @@
         "andreiio/blade-remix-icon": "^3.9",
         "davidhsianturi/blade-bootstrap-icons": "^2.1",
         "filament/filament": "^3.0",
+        "google-gemini-php/laravel": "^2.0",
         "hasnayeen/themes": "^3.0",
+        "intervention/image-laravel": "^1.5",
         "laravel/cashier-paddle": "^2.6",
         "laravel/framework": "^12.0",
         "laravel/sanctum": "^4.3",
         "laravel/tinker": "^2.10.1",
+        "openai-php/laravel": "^0.18.0",
         "owenvoke/blade-fontawesome": "^2.9"
     },
     "require-dev": {

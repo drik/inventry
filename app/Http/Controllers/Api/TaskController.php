@@ -100,14 +100,13 @@ class TaskController extends Controller
             ->with(['category', 'location', 'primaryImage', 'tagValues.tag'])
             ->get();
 
-        // All org asset barcodes for offline resolution
+        // All org asset codes for offline resolution
         $allBarcodes = Asset::withoutGlobalScopes()
             ->where('organization_id', $orgId)
             ->with('tagValues')
-            ->get(['id', 'barcode', 'asset_code'])
+            ->get(['id', 'asset_code'])
             ->map(fn (Asset $a) => [
                 'asset_id' => $a->id,
-                'barcode' => $a->barcode,
                 'asset_code' => $a->asset_code,
                 'tag_values' => $a->tagValues->pluck('value')->toArray(),
             ]);
@@ -140,7 +139,6 @@ class TaskController extends Controller
                 'id' => $a->id,
                 'name' => $a->name,
                 'asset_code' => $a->asset_code,
-                'barcode' => $a->barcode,
                 'serial_number' => $a->serial_number,
                 'category_name' => $a->category?->name,
                 'location_name' => $a->location?->name,

@@ -12,14 +12,13 @@ use App\Notifications\InventoryTaskCompleted;
 class InventoryScanService
 {
     /**
-     * Resolve an asset from a barcode/asset_code/tag value.
+     * Resolve an asset from an asset_code or tag value.
      */
     public function resolveAsset(string $code, string $organizationId): ?Asset
     {
         return Asset::where('organization_id', $organizationId)
             ->where(function ($query) use ($code) {
-                $query->where('barcode', $code)
-                    ->orWhere('asset_code', $code)
+                $query->where('asset_code', $code)
                     ->orWhereHas('tagValues', fn ($q) => $q->where('value', $code));
             })
             ->first();

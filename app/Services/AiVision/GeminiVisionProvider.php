@@ -50,6 +50,12 @@ class GeminiVisionProvider implements VisionProviderInterface
         $result = $response->json(true);
         $usage = $response->usageMetadata ?? null;
 
+        if (! is_array($result)) {
+            // Extract raw text for debugging if JSON parsing failed
+            $rawText = $response->text() ?? '';
+            throw new \RuntimeException("Gemini returned invalid JSON response: {$rawText}");
+        }
+
         return [
             'response' => $result,
             'prompt_tokens' => $usage?->promptTokenCount,

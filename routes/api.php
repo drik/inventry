@@ -34,6 +34,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/tasks/{taskId}/unexpected', [TaskController::class, 'unexpected']);
 
     // AI Vision
+    Route::get('/ai-usage', [AiVisionController::class, 'usage']);
     Route::post('/tasks/{taskId}/ai-identify', [AiVisionController::class, 'identify'])
         ->middleware(['throttle:ai-vision', 'plan.limit:max_ai_requests_daily']);
     Route::post('/tasks/{taskId}/ai-verify', [AiVisionController::class, 'verify'])

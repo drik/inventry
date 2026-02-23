@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\EncodingMode;
 use Filament\Models\Contracts\HasCurrentTenantLabel;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -35,6 +36,33 @@ class Organization extends Model implements HasCurrentTenantLabel
         return [
             'settings' => 'array',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::created(function (Organization $organization) {
+            AssetTag::withoutGlobalScopes()->create([
+                'organization_id' => $organization->id,
+                'category_id' => null,
+                'name' => 'Serial Number',
+                'description' => 'Manufacturer serial number',
+                'is_required' => false,
+                'encoding_mode' => EncodingMode::QrCode,
+                'sort_order' => 1,
+                'is_system' => true,
+            ]);
+
+            AssetTag::withoutGlobalScopes()->create([
+                'organization_id' => $organization->id,
+                'category_id' => null,
+                'name' => 'SKU',
+                'description' => 'Stock Keeping Unit',
+                'is_required' => false,
+                'encoding_mode' => EncodingMode::EAN13,
+                'sort_order' => 2,
+                'is_system' => true,
+            ]);
+        });
     }
 
     public function getCurrentTenantLabel(): string

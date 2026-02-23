@@ -12,6 +12,7 @@ use App\Services\InventoryScanService;
 use App\Services\PlanLimitService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class AiVisionController extends Controller
 {
@@ -33,6 +34,10 @@ class AiVisionController extends Controller
 
         $request->validate([
             'photo' => 'required|image|mimes:jpeg,jpg,png|max:'.(config('ai-vision.limits.max_image_size_kb', 2048)),
+            'bbox_x' => 'sometimes|numeric|min:0|max:1',
+            'bbox_y' => 'sometimes|numeric|min:0|max:1',
+            'bbox_width' => 'sometimes|numeric|min:0.01|max:1',
+            'bbox_height' => 'sometimes|numeric|min:0.01|max:1',
         ]);
 
         $task = $this->findTask($request, $taskId);
@@ -47,15 +52,28 @@ class AiVisionController extends Controller
             ], 403);
         }
 
-        // Store the captured photo
+        // Build bounding box if all coordinates are provided
+        $boundingBox = null;
+        if ($request->filled(['bbox_x', 'bbox_y', 'bbox_width', 'bbox_height'])) {
+            $boundingBox = [
+                'x' => (float) $request->input('bbox_x'),
+                'y' => (float) $request->input('bbox_y'),
+                'width' => (float) $request->input('bbox_width'),
+                'height' => (float) $request->input('bbox_height'),
+            ];
+        }
+
+        // Store the captured photo (original, without bounding box)
         $imagePath = $this->aiVisionService->storeCapturedPhoto($org, $request->file('photo'));
 
         // Analyze the photo
         $result = $this->aiVisionService->analyzePhoto(
-            imagePath: storage_path('app/'.$imagePath),
+            imagePath: Storage::disk('public')->path($imagePath),
             organization: $org,
             locationId: $task->location_id,
             taskId: $task->id,
+            storagePath: $imagePath,
+            boundingBox: $boundingBox,
         );
 
         // Build match details with asset info
@@ -124,6 +142,10 @@ class AiVisionController extends Controller
         $request->validate([
             'photo' => 'required|image|mimes:jpeg,jpg,png|max:'.(config('ai-vision.limits.max_image_size_kb', 2048)),
             'asset_id' => 'required|string',
+            'bbox_x' => 'sometimes|numeric|min:0|max:1',
+            'bbox_y' => 'sometimes|numeric|min:0|max:1',
+            'bbox_width' => 'sometimes|numeric|min:0.01|max:1',
+            'bbox_height' => 'sometimes|numeric|min:0.01|max:1',
         ]);
 
         $task = $this->findTask($request, $taskId);
@@ -138,19 +160,32 @@ class AiVisionController extends Controller
             ], 403);
         }
 
+        // Build bounding box if all coordinates are provided
+        $boundingBox = null;
+        if ($request->filled(['bbox_x', 'bbox_y', 'bbox_width', 'bbox_height'])) {
+            $boundingBox = [
+                'x' => (float) $request->input('bbox_x'),
+                'y' => (float) $request->input('bbox_y'),
+                'width' => (float) $request->input('bbox_width'),
+                'height' => (float) $request->input('bbox_height'),
+            ];
+        }
+
         $asset = Asset::withoutGlobalScopes()
             ->where('organization_id', $org->id)
             ->findOrFail($request->input('asset_id'));
 
-        // Store the captured photo
+        // Store the captured photo (original, without bounding box)
         $imagePath = $this->aiVisionService->storeCapturedPhoto($org, $request->file('photo'));
 
         // Verify identity
         $result = $this->aiVisionService->verifyAssetIdentity(
-            capturedImagePath: storage_path('app/'.$imagePath),
+            capturedImagePath: Storage::disk('public')->path($imagePath),
             asset: $asset,
             organization: $org,
             taskId: $task->id,
+            boundingBox: $boundingBox,
+            storagePath: $imagePath,
         );
 
         $usage = $this->aiVisionService->getUsageStats($org);
@@ -292,6 +327,22 @@ class AiVisionController extends Controller
         }
 
         return response()->json(['message' => 'Action non reconnue.'], 422);
+    }
+
+    /**
+     * Get AI usage stats and quota.
+     * GET /api/ai-usage
+     */
+    public function usage(Request $request): JsonResponse
+    {
+        $org = $request->user()->organization;
+        $usage = $this->aiVisionService->getUsageStats($org);
+        $enabled = (bool) config('ai-vision.enabled');
+
+        return response()->json([
+            'enabled' => $enabled,
+            'usage' => $usage,
+        ]);
     }
 
     protected function findTask(Request $request, string $taskId): InventoryTask

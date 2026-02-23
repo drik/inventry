@@ -13,7 +13,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Str;
 
 class Asset extends Model
 {
@@ -28,8 +27,6 @@ class Asset extends Model
         'location_id',
         'department_id',
         'manufacturer_id',
-        'serial_number',
-        'sku',
         'status',
         'purchase_date',
         'purchase_cost',
@@ -39,7 +36,6 @@ class Asset extends Model
         'useful_life_months',
         'salvage_value',
         'retirement_date',
-        'barcode',
         'qr_code_path',
         'notes',
         'custom_field_values',
@@ -65,9 +61,6 @@ class Asset extends Model
             if (empty($asset->asset_code)) {
                 $asset->asset_code = static::generateAssetCode($asset->organization_id);
             }
-            if (empty($asset->barcode)) {
-                $asset->barcode = static::generateBarcode($asset->organization_id);
-            }
         });
     }
 
@@ -86,18 +79,20 @@ class Asset extends Model
         return 'AST-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
     }
 
-    public static function generateBarcode(string $organizationId): string
-    {
-        do {
-            $barcode = strtoupper(Str::random(12));
-        } while (
-            static::withoutGlobalScopes()
-                ->where('organization_id', $organizationId)
-                ->where('barcode', $barcode)
-                ->exists()
-        );
+    // Accessors for backward compatibility (serial_number and sku are now stored as AssetTagValues)
 
-        return $barcode;
+    public function getSerialNumberAttribute(): ?string
+    {
+        return $this->tagValues
+            ->first(fn ($tv) => $tv->tag?->is_system && $tv->tag?->name === 'Serial Number')
+            ?->value;
+    }
+
+    public function getSkuAttribute(): ?string
+    {
+        return $this->tagValues
+            ->first(fn ($tv) => $tv->tag?->is_system && $tv->tag?->name === 'SKU')
+            ?->value;
     }
 
     // Relationships

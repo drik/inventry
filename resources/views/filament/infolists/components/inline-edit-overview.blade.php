@@ -62,18 +62,6 @@
             'value' => $record->department_id,
             'options' => \App\Models\Department::pluck('name', 'id')->toArray(),
         ],
-        [
-            'name' => 'serial_number',
-            'label' => 'Serial Number',
-            'type' => 'text',
-            'value' => $record->serial_number,
-        ],
-        [
-            'name' => 'barcode',
-            'label' => 'Barcode',
-            'type' => 'text',
-            'value' => $record->barcode,
-        ],
     ];
 @endphp
 

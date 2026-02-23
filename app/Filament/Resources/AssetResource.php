@@ -84,11 +84,6 @@ class AssetResource extends Resource
                     ->placeholder('—')
                     ->toggleable(isToggledHiddenByDefault: true),
 
-                Tables\Columns\TextColumn::make('serial_number')
-                    ->label('N° série')
-                    ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-
                 Tables\Columns\TextColumn::make('purchase_cost')
                     ->label('Coût')
                     ->money('USD')
@@ -165,18 +160,18 @@ class AssetResource extends Resource
 
                 Infolists\Components\Section::make('Identification')
                     ->schema([
-                        Infolists\Components\TextEntry::make('serial_number')
-                            ->label('Numéro de série')
-                            ->placeholder('—'),
-
-                        Infolists\Components\TextEntry::make('sku')
-                            ->label('SKU')
-                            ->placeholder('—'),
-
-                        Infolists\Components\TextEntry::make('barcode')
-                            ->label('Code-barres')
-                            ->placeholder('—'),
-                    ])->columns(3),
+                        Infolists\Components\RepeatableEntry::make('tagValues')
+                            ->label('Tags d\'identification')
+                            ->schema([
+                                Infolists\Components\TextEntry::make('tag.name')
+                                    ->label('Tag'),
+                                Infolists\Components\TextEntry::make('value')
+                                    ->label('Valeur')
+                                    ->placeholder('—'),
+                            ])
+                            ->columns(2)
+                            ->columnSpanFull(),
+                    ]),
 
                 Infolists\Components\Section::make('Financier')
                     ->schema([

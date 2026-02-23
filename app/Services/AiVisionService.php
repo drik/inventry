@@ -32,12 +32,16 @@ class AiVisionService
         Organization $organization,
         ?string $locationId = null,
         ?string $taskId = null,
+        ?string $storagePath = null,
+        ?array $boundingBox = null,
     ): array {
         $startTime = microtime(true);
         $usedFallback = false;
 
         // Prepare the captured image
-        $capturedBase64 = $this->prepareImage($imagePath);
+        $prepared = $this->prepareImage($imagePath, $boundingBox, $storagePath);
+        $capturedBase64 = $prepared['base64'];
+        $annotatedImagePath = $prepared['annotated_path'];
 
         // Select candidate assets for matching
         $candidates = $this->selectCandidates($organization, $locationId, $taskId);
@@ -61,7 +65,7 @@ class AiVisionService
             ->toArray();
 
         $prompt = $this->buildIdentifyPrompt($categories, $candidates);
-        $systemPrompt = $this->getSystemPrompt();
+        $systemPrompt = $this->getSystemPrompt(hasBoundingBox: $boundingBox !== null);
 
         // Select provider based on plan
         $provider = $this->getProvider($organization);
@@ -125,8 +129,11 @@ class AiVisionService
         $log = $this->logRecognition(
             organization: $organization,
             taskId: $taskId,
-            imagePath: $imagePath,
+            imagePath: $storagePath ?? $imagePath,
+            annotatedImagePath: $annotatedImagePath,
             useCase: 'identify',
+            systemPrompt: $systemPrompt,
+            userPrompt: $prompt,
             provider: $provider,
             usedFallback: $usedFallback,
             response: $response,
@@ -155,11 +162,15 @@ class AiVisionService
         Asset $asset,
         Organization $organization,
         ?string $taskId = null,
+        ?array $boundingBox = null,
+        ?string $storagePath = null,
     ): array {
         $startTime = microtime(true);
         $usedFallback = false;
 
-        $capturedBase64 = $this->prepareImage($capturedImagePath);
+        $prepared = $this->prepareImage($capturedImagePath, $boundingBox, $storagePath);
+        $capturedBase64 = $prepared['base64'];
+        $annotatedImagePath = $prepared['annotated_path'];
 
         // Get asset's primary image
         $assetImage = $asset->primaryImage;
@@ -175,7 +186,7 @@ class AiVisionService
             ];
         }
 
-        $referenceBase64 = $this->prepareImage(Storage::path($assetImage->file_path));
+        $referenceBase64 = $this->prepareImage(Storage::path($assetImage->file_path))['base64'];
 
         $images = [
             'captured' => $capturedBase64,
@@ -183,7 +194,7 @@ class AiVisionService
         ];
 
         $prompt = $this->buildVerifyPrompt($asset);
-        $systemPrompt = $this->getSystemPrompt();
+        $systemPrompt = $this->getSystemPrompt(hasBoundingBox: $boundingBox !== null);
 
         $provider = $this->getProvider($organization);
 
@@ -213,8 +224,11 @@ class AiVisionService
         $log = $this->logRecognition(
             organization: $organization,
             taskId: $taskId,
-            imagePath: $capturedImagePath,
+            imagePath: $storagePath ?? $capturedImagePath,
+            annotatedImagePath: $annotatedImagePath,
             useCase: 'verify',
+            systemPrompt: $systemPrompt,
+            userPrompt: $prompt,
             provider: $provider,
             usedFallback: $usedFallback,
             response: $response,
@@ -401,18 +415,66 @@ class AiVisionService
 
     /**
      * Prepare an image for the API: resize to max 1024px, compress to JPEG 85%.
+     * When a bounding box is provided, draws it on the image and saves the annotated version.
+     *
+     * @return array{base64: string, annotated_path: string|null}
      */
-    protected function prepareImage(string $absolutePath): string
+    protected function prepareImage(string $absolutePath, ?array $boundingBox = null, ?string $storagePath = null): array
     {
         $image = Image::read($absolutePath);
 
         // Resize to max 1024px on longest side
-        $image->scaleDown(1024, 1024);
+        $image->scaleDown(512, 512);
+
+        $annotatedPath = null;
+
+        // Draw bounding box if provided
+        if ($boundingBox) {
+            $this->drawBoundingBox($image, $boundingBox);
+
+            // Save the annotated image
+            if ($storagePath) {
+                $dir = pathinfo($storagePath, PATHINFO_DIRNAME);
+                $filename = 'annotated_'.pathinfo($storagePath, PATHINFO_BASENAME);
+                $annotatedPath = $dir.'/'.$filename;
+                Storage::disk('public')->put($annotatedPath, (string) $image->toJpeg(85));
+            }
+        }
 
         // Encode to JPEG 85%
         $encoded = $image->toJpeg(85);
 
-        return base64_encode((string) $encoded);
+        return [
+            'base64' => base64_encode((string) $encoded),
+            'annotated_path' => $annotatedPath,
+        ];
+    }
+
+    /**
+     * Draw a bounding box rectangle on the image.
+     * Coordinates are percentages (0.0 to 1.0) of image dimensions.
+     */
+    protected function drawBoundingBox($image, array $boundingBox): void
+    {
+        $imgWidth = $image->width();
+        $imgHeight = $image->height();
+
+        // Convert percentage coordinates to pixel values
+        $x = (int) round($boundingBox['x'] * $imgWidth);
+        $y = (int) round($boundingBox['y'] * $imgHeight);
+        $width = (int) round($boundingBox['width'] * $imgWidth);
+        $height = (int) round($boundingBox['height'] * $imgHeight);
+
+        // Clamp to image boundaries
+        $x = max(0, min($x, $imgWidth - 1));
+        $y = max(0, min($y, $imgHeight - 1));
+        $width = min($width, $imgWidth - $x);
+        $height = min($height, $imgHeight - $y);
+
+        $image->drawRectangle($x, $y, function ($rectangle) use ($width, $height) {
+            $rectangle->size($width, $height);
+            $rectangle->border('ff0000', 3);
+        });
     }
 
     /**
@@ -420,15 +482,15 @@ class AiVisionService
      */
     protected function prepareImageFromStorage(string $storagePath): string
     {
-        return $this->prepareImage(Storage::path($storagePath));
+        return $this->prepareImage(Storage::path($storagePath))['base64'];
     }
 
     /**
      * Get the system prompt for the LLM.
      */
-    protected function getSystemPrompt(): string
+    protected function getSystemPrompt(bool $hasBoundingBox = false): string
     {
-        return <<<'PROMPT'
+        $prompt = <<<'PROMPT'
 Tu es un assistant spécialisé dans l'identification d'actifs physiques pour un inventaire d'entreprise. Tu analyses des photos prises par des employés pendant un inventaire physique. Tu dois identifier l'objet et le comparer aux images de référence fournies.
 
 Règles :
@@ -437,6 +499,12 @@ Règles :
 - Réponds UNIQUEMENT en JSON valide
 - Les scores de confiance vont de 0.0 (aucune confiance) à 1.0 (certitude absolue)
 PROMPT;
+
+        if ($hasBoundingBox) {
+            $prompt .= "\n- L'objet cible est mis en évidence par un rectangle rouge sur la photo capturée. Concentre ton analyse UNIQUEMENT sur l'objet à l'intérieur de ce rectangle rouge.";
+        }
+
+        return $prompt;
     }
 
     /**
@@ -494,7 +562,10 @@ PROMPT;
         Organization $organization,
         ?string $taskId,
         string $imagePath,
+        ?string $annotatedImagePath,
         string $useCase,
+        string $systemPrompt,
+        string $userPrompt,
         VisionProviderInterface $provider,
         bool $usedFallback,
         array $response,
@@ -518,7 +589,10 @@ PROMPT;
             'task_id' => $taskId,
             'user_id' => auth()->id(),
             'captured_image_path' => $imagePath,
+            'annotated_image_path' => $annotatedImagePath,
             'use_case' => $useCase,
+            'system_prompt' => $systemPrompt,
+            'user_prompt' => $userPrompt,
             'provider' => $provider->getProviderName(),
             'model' => $provider->getModelName(),
             'used_fallback' => $usedFallback,
@@ -555,6 +629,6 @@ PROMPT;
         $date = now()->format('Y-m-d');
         $directory = "ai-captures/{$org->id}/{$date}";
 
-        return $uploadedFile->store($directory);
+        return $uploadedFile->store($directory, 'public');
     }
 }

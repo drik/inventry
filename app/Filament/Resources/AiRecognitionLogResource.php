@@ -9,6 +9,7 @@ use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Storage;
 
 class AiRecognitionLogResource extends Resource
 {
@@ -211,9 +212,18 @@ class AiRecognitionLogResource extends Resource
                             ->label('Date')
                             ->dateTime('d/m/Y H:i:s'),
 
-                        Infolists\Components\TextEntry::make('captured_image_path')
-                            ->label('Image capturée')
+                        Infolists\Components\ImageEntry::make('captured_image_path')
+                            ->label('Image originale')
+                            ->disk('public')
+                            ->height(200)
                             ->placeholder('—'),
+
+                        Infolists\Components\ImageEntry::make('annotated_image_path')
+                            ->label('Image envoyée à l\'IA')
+                            ->disk('public')
+                            ->height(200)
+                            ->placeholder('—')
+                            ->visible(fn ($record) => $record->annotated_image_path !== null),
 
                         Infolists\Components\TextEntry::make('task.id')
                             ->label('Tâche')
@@ -304,6 +314,21 @@ class AiRecognitionLogResource extends Resource
                             ->placeholder('—')
                             ->columnSpanFull(),
                     ])->columns(2),
+
+                Infolists\Components\Section::make('Prompts envoyés')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('system_prompt')
+                            ->label('System prompt')
+                            ->placeholder('—')
+                            ->columnSpanFull(),
+
+                        Infolists\Components\TextEntry::make('user_prompt')
+                            ->label('User prompt')
+                            ->placeholder('—')
+                            ->columnSpanFull(),
+                    ])
+                    ->collapsible()
+                    ->collapsed(),
 
                 Infolists\Components\Section::make('Réponse IA brute')
                     ->schema([

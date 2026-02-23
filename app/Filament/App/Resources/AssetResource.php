@@ -9,7 +9,9 @@ use App\Filament\App\Resources\AssetResource\Actions;
 use App\Filament\App\Resources\AssetResource\Pages;
 use App\Filament\App\Resources\AssetResource\RelationManagers;
 use App\Models\Asset;
+use App\Models\AssetCategory;
 use App\Models\AssetTag;
+use Filament\Facades\Filament;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Infolists;
@@ -58,9 +60,8 @@ class AssetResource extends Resource
                                                     return;
                                                 }
 
-                                                $tags = AssetTag::where('category_id', $state)
-                                                    ->orderBy('sort_order')
-                                                    ->get();
+                                                $orgId = Filament::getTenant()->id;
+                                                $tags = AssetCategory::getAllTagsForCategory($state, $orgId);
 
                                                 $values = [];
                                                 foreach ($tags as $tag) {
@@ -107,20 +108,8 @@ class AssetResource extends Resource
                                             ->dehydrated(false)
                                             ->placeholder('Auto-generated')
                                             ->visibleOn('edit'),
-
-                                        Forms\Components\TextInput::make('serial_number')
-                                            ->maxLength(255),
-
-                                        Forms\Components\TextInput::make('sku')
-                                            ->label('SKU')
-                                            ->maxLength(255),
-
-                                        Forms\Components\TextInput::make('barcode')
-                                            ->disabled()
-                                            ->dehydrated(false)
-                                            ->placeholder('Auto-generated')
-                                            ->visibleOn('edit'),
-                                    ])->columns(2),
+                                    ])
+                                    ->visibleOn('edit'),
 
                                 Forms\Components\Section::make('Identification Tags')
                                     ->schema([
@@ -131,12 +120,12 @@ class AssetResource extends Resource
                                                     ->label('Tag')
                                                     ->options(function (Forms\Get $get) {
                                                         $categoryId = $get('../../category_id');
-                                                        if (! $categoryId) {
+                                                        $orgId = Filament::getTenant()?->id;
+                                                        if (! $orgId) {
                                                             return [];
                                                         }
 
-                                                        return AssetTag::where('category_id', $categoryId)
-                                                            ->orderBy('sort_order')
+                                                        return AssetCategory::getAllTagsForCategory($categoryId, $orgId)
                                                             ->pluck('name', 'id');
                                                     })
                                                     ->disabled()
@@ -192,13 +181,12 @@ class AssetResource extends Resource
                                             })
                                             ->afterStateHydrated(function ($state, Forms\Get $get, Forms\Set $set) {
                                                 $categoryId = $get('category_id');
-                                                if (! $categoryId) {
+                                                $orgId = Filament::getTenant()?->id;
+                                                if (! $orgId) {
                                                     return;
                                                 }
 
-                                                $tags = AssetTag::where('category_id', $categoryId)
-                                                    ->orderBy('sort_order')
-                                                    ->get();
+                                                $tags = AssetCategory::getAllTagsForCategory($categoryId, $orgId);
                                                 $tagsById = $tags->keyBy('id');
 
                                                 $existingTagIds = collect($state ?? [])
@@ -216,7 +204,7 @@ class AssetResource extends Resource
                                                 }
                                                 unset($entry);
 
-                                                // Add missing tags
+                                                // Add missing tags (global + ancestor + current category)
                                                 foreach ($tags as $tag) {
                                                     if (! in_array($tag->id, $existingTagIds)) {
                                                         $newState[] = [
@@ -226,6 +214,15 @@ class AssetResource extends Resource
                                                         ];
                                                     }
                                                 }
+
+                                                // Reorder to match tag collection order (global first, then ancestor chain)
+                                                $tagOrder = $tags->pluck('id')->flip();
+                                                usort($newState, function ($a, $b) use ($tagOrder) {
+                                                    $orderA = $tagOrder[$a['asset_tag_id']] ?? PHP_INT_MAX;
+                                                    $orderB = $tagOrder[$b['asset_tag_id']] ?? PHP_INT_MAX;
+
+                                                    return $orderA <=> $orderB;
+                                                });
 
                                                 $set('tagValues', $newState);
                                             }),
@@ -368,10 +365,6 @@ class AssetResource extends Resource
                     ->placeholder('—')
                     ->toggleable(),
 
-                Tables\Columns\TextColumn::make('serial_number')
-                    ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-
                 Tables\Columns\TextColumn::make('purchase_date')
                     ->date()
                     ->sortable()
@@ -457,9 +450,9 @@ class AssetResource extends Resource
                                                         ->badge(),
                                                 ]),
 
-                                            Infolists\Components\ImageEntry::make('primaryImage.file_path')
+                                            Infolists\Components\ViewEntry::make('primaryImage')
                                                 ->label('')
-                                                ->height(200),
+                                                ->view('filament.infolists.components.primary-image-lightbox'),
                                         ])->columnSpan(1),
 
                                         Infolists\Components\ViewEntry::make('editable_details')
@@ -616,6 +609,6 @@ class AssetResource extends Resource
 
     public static function getGloballySearchableAttributes(): array
     {
-        return ['asset_code', 'name', 'serial_number', 'sku', 'barcode'];
+        return ['asset_code', 'name', 'tagValues.value'];
     }
 }

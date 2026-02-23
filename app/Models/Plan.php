@@ -7,10 +7,21 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Cache;
 
 class Plan extends Model
 {
     use HasFactory, HasUlids, SoftDeletes;
+
+    protected static function booted(): void
+    {
+        static::saved(function (Plan $plan) {
+            // Clear cached plan for all organizations using this plan
+            $plan->organizations()->pluck('id')->each(function ($orgId) {
+                Cache::forget("org:{$orgId}:plan");
+            });
+        });
+    }
 
     protected $fillable = [
         'name',

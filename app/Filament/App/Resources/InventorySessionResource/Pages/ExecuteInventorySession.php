@@ -57,9 +57,8 @@ class ExecuteInventorySession extends Page
             return;
         }
 
-        // Find asset by barcode, asset_code, or tag value
-        $asset = Asset::where('barcode', $code)
-            ->orWhere('asset_code', $code)
+        // Find asset by asset_code or tag value
+        $asset = Asset::where('asset_code', $code)
             ->orWhereHas('tagValues', fn ($q) => $q->where('value', $code))
             ->first();
 

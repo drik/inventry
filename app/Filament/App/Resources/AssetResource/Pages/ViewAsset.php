@@ -133,7 +133,7 @@ class ViewAsset extends ViewRecord
     {
         $allowedFields = [
             'name', 'category_id', 'manufacturer_id', 'status',
-            'location_id', 'department_id', 'serial_number', 'barcode',
+            'location_id', 'department_id',
             'purchase_cost', 'purchase_date', 'warranty_expiry',
             'depreciation_method', 'useful_life_months', 'salvage_value',
         ];

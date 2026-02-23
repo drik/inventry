@@ -22,15 +22,40 @@ class AssetTag extends Model
         'is_required',
         'encoding_mode',
         'sort_order',
+        'is_system',
     ];
 
     protected function casts(): array
     {
         return [
             'is_required' => 'boolean',
+            'is_system' => 'boolean',
             'encoding_mode' => EncodingMode::class,
         ];
     }
+
+    protected static function booted(): void
+    {
+        static::deleting(function (AssetTag $tag) {
+            if ($tag->is_system) {
+                throw new \RuntimeException('System tags cannot be deleted.');
+            }
+        });
+    }
+
+    // Scopes
+
+    public function scopeGlobal($query)
+    {
+        return $query->whereNull('category_id');
+    }
+
+    public function scopeSystem($query)
+    {
+        return $query->where('is_system', true);
+    }
+
+    // Relationships
 
     public function category(): BelongsTo
     {

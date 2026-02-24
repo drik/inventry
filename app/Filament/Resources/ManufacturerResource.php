@@ -4,6 +4,8 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ManufacturerResource\Pages;
 use App\Models\Manufacturer;
+use Filament\Forms;
+use Filament\Forms\Form;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
@@ -26,9 +28,41 @@ class ManufacturerResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Fabricants';
 
-    public static function canCreate(): bool
+    public static function form(Form $form): Form
     {
-        return false;
+        return $form
+            ->schema([
+                Forms\Components\Section::make()
+                    ->schema([
+                        Forms\Components\TextInput::make('name')
+                            ->label('Nom')
+                            ->required()
+                            ->maxLength(255),
+
+                        Forms\Components\TextInput::make('website')
+                            ->label('Site web')
+                            ->url()
+                            ->prefixIcon('heroicon-o-globe-alt')
+                            ->maxLength(255),
+
+                        Forms\Components\TextInput::make('support_email')
+                            ->label('Email support')
+                            ->email()
+                            ->prefixIcon('heroicon-o-envelope')
+                            ->maxLength(255),
+
+                        Forms\Components\TextInput::make('support_phone')
+                            ->label('Tél. support')
+                            ->tel()
+                            ->prefixIcon('heroicon-o-phone')
+                            ->maxLength(255),
+
+                        Forms\Components\Textarea::make('notes')
+                            ->label('Notes')
+                            ->rows(3)
+                            ->columnSpanFull(),
+                    ])->columns(2),
+            ]);
     }
 
     public static function table(Table $table): Table
@@ -81,6 +115,10 @@ class ManufacturerResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
+                Tables\Actions\EditAction::make()
+                    ->visible(fn ($record) => $record->isDefault()),
+                Tables\Actions\DeleteAction::make()
+                    ->visible(fn ($record) => $record->isDefault()),
             ]);
     }
 
@@ -126,6 +164,8 @@ class ManufacturerResource extends Resource
     {
         return [
             'index' => Pages\ListManufacturers::route('/'),
+            'create' => Pages\CreateManufacturer::route('/create'),
+            'edit' => Pages\EditManufacturer::route('/{record}/edit'),
         ];
     }
 }

@@ -79,8 +79,7 @@ class AssetModelResource extends Resource
             ->columns([
                 Tables\Columns\ImageColumn::make('image_path')
                     ->label('Image')
-                    ->circular()
-                    ->size(40),
+                    ->width(50),
 
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()

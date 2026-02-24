@@ -149,7 +149,57 @@ curl http://localhost:8000/api/tasks/{taskId}/download \
   -H "Accept: application/json"
 ```
 
-**Réponse :** Contient `task`, `session`, `location`, `items`, `assets` (avec images et tags), et `all_asset_barcodes` (index léger de tous les barcodes de l'organisation pour résolution offline).
+**Réponse :**
+```json
+{
+  "task": { "id": "01HX...", "status": "pending", "notes": null },
+  "session": { "id": "01HX...", "name": "Inventaire Q1", "status": "in_progress" },
+  "location": { "id": "01HX...", "name": "Siège - Lomé", "city": "Lomé" },
+  "items": [
+    {
+      "id": "01HX...",
+      "asset_id": "01HX...",
+      "status": "pending",
+      "scanned_at": null,
+      "scanned_by": null,
+      "condition_notes": null
+    }
+  ],
+  "assets": [
+    {
+      "id": "01HX...",
+      "name": "MacBook Pro 14\"",
+      "asset_code": "AST-00001",
+      "serial_number": "FVFXJ3K1Q6LR",
+      "category_name": "Ordinateurs portables",
+      "location_name": "Siège - Lomé",
+      "status": "active",
+      "model_name": "MacBook Pro 14-inch",
+      "model_number": "A2625",
+      "supplier_name": "Apple Store Lomé",
+      "primary_image_url": "http://localhost:8000/storage/...",
+      "tag_values": [
+        {
+          "id": "01HX...",
+          "tag_name": "Serial Number",
+          "value": "FVFXJ3K1Q6LR",
+          "encoding_mode": "qr_code"
+        }
+      ]
+    }
+  ],
+  "all_asset_barcodes": [
+    {
+      "asset_id": "01HX...",
+      "asset_code": "AST-00001",
+      "tag_values": ["FVFXJ3K1Q6LR", "6340971823"]
+    }
+  ],
+  "downloaded_at": "2026-02-23T10:00:00+00:00"
+}
+```
+
+`all_asset_barcodes` est un index léger de tous les assets de l'organisation pour la résolution offline (via `asset_code` ou `tag_values`).
 
 ### `POST /api/tasks/{taskId}/start`
 
@@ -181,7 +231,7 @@ curl -X POST http://localhost:8000/api/tasks/{taskId}/complete \
 
 ### `POST /api/tasks/{taskId}/scan`
 
-Scan d'un barcode en mode connecté.
+Scan d'un code en mode connecté.
 
 ```bash
 curl -X POST http://localhost:8000/api/tasks/{taskId}/scan \
@@ -204,6 +254,8 @@ curl -X POST http://localhost:8000/api/tasks/{taskId}/scan \
     "name": "MacBook Pro 14\"",
     "asset_code": "AST-00001",
     "category_name": "Ordinateurs portables",
+    "model_name": "MacBook Pro 14-inch",
+    "supplier_name": "Apple Store Lomé",
     "primary_image_url": "http://..."
   },
   "item": {
@@ -351,12 +403,22 @@ Identifie un asset à partir d'une photo et cherche des correspondances parmi le
 curl -X POST http://localhost:8000/api/tasks/{taskId}/ai-identify \
   -H "Authorization: Bearer {token}" \
   -H "Accept: application/json" \
-  -F "photo=@/path/to/photo.jpg"
+  -F "photo=@/path/to/photo.jpg" \
+  -F "bbox_x=0.1" \
+  -F "bbox_y=0.2" \
+  -F "bbox_width=0.5" \
+  -F "bbox_height=0.6"
 ```
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `photo` | file | Image JPEG/PNG, max 2048 Ko |
+| `photo` | file | **Requis.** Image JPEG/PNG, max 2048 Ko |
+| `bbox_x` | float | Optionnel. Coordonnée X du coin supérieur gauche (0-1) |
+| `bbox_y` | float | Optionnel. Coordonnée Y du coin supérieur gauche (0-1) |
+| `bbox_width` | float | Optionnel. Largeur de la zone (0.01-1) |
+| `bbox_height` | float | Optionnel. Hauteur de la zone (0.01-1) |
+
+Les 4 paramètres `bbox_*` doivent être fournis ensemble ou pas du tout. Ils permettent de cadrer une zone d'intérêt dans la photo.
 
 **Réponse 200 :**
 ```json
@@ -377,6 +439,7 @@ curl -X POST http://localhost:8000/api/tasks/{taskId}/ai-identify \
       "asset_code": "AST-00042",
       "category_name": "Ordinateurs portables",
       "location_name": "Siège - Lomé",
+      "model_name": "MacBook Pro 14-inch",
       "primary_image_url": "http://localhost:8000/storage/...",
       "confidence": 0.88,
       "reasoning": "Même modèle, numéro de série visible correspond",
@@ -410,13 +473,21 @@ curl -X POST http://localhost:8000/api/tasks/{taskId}/ai-verify \
   -H "Authorization: Bearer {token}" \
   -H "Accept: application/json" \
   -F "photo=@/path/to/photo.jpg" \
-  -F "asset_id=01HX..."
+  -F "asset_id=01HX..." \
+  -F "bbox_x=0.1" \
+  -F "bbox_y=0.2" \
+  -F "bbox_width=0.5" \
+  -F "bbox_height=0.6"
 ```
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `photo` | file | Image JPEG/PNG, max 2048 Ko |
-| `asset_id` | string | ID de l'asset à vérifier |
+| `photo` | file | **Requis.** Image JPEG/PNG, max 2048 Ko |
+| `asset_id` | string | **Requis.** ID de l'asset à vérifier |
+| `bbox_x` | float | Optionnel. Coordonnée X du coin supérieur gauche (0-1) |
+| `bbox_y` | float | Optionnel. Coordonnée Y du coin supérieur gauche (0-1) |
+| `bbox_width` | float | Optionnel. Largeur de la zone (0.01-1) |
+| `bbox_height` | float | Optionnel. Hauteur de la zone (0.01-1) |
 
 **Réponse 200 :**
 ```json

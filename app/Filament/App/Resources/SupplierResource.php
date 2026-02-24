@@ -41,18 +41,22 @@ class SupplierResource extends Resource
                             ->nullable(),
 
                         Forms\Components\TextInput::make('contact_name')
+                            ->prefixIcon('heroicon-o-user')
                             ->maxLength(255),
 
                         Forms\Components\TextInput::make('email')
                             ->email()
+                            ->prefixIcon('heroicon-o-envelope')
                             ->maxLength(255),
 
                         Forms\Components\TextInput::make('phone')
                             ->tel()
+                            ->prefixIcon('heroicon-o-phone')
                             ->maxLength(255),
 
                         Forms\Components\TextInput::make('fax')
                             ->tel()
+                            ->prefixIcon('heroicon-o-printer')
                             ->maxLength(255),
                     ])->columns(2),
 
@@ -64,6 +68,7 @@ class SupplierResource extends Resource
                         Forms\Components\TextInput::make('url')
                             ->label('Website')
                             ->url()
+                            ->prefixIcon('heroicon-o-globe-alt')
                             ->maxLength(255),
 
                         Forms\Components\Textarea::make('notes')

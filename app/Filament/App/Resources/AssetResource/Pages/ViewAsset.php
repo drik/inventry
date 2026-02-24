@@ -132,8 +132,8 @@ class ViewAsset extends ViewRecord
     public function updateAssetField(string $field, mixed $value): void
     {
         $allowedFields = [
-            'name', 'category_id', 'manufacturer_id', 'status',
-            'location_id', 'department_id',
+            'name', 'category_id', 'manufacturer_id', 'model_id', 'supplier_id',
+            'status', 'location_id', 'department_id',
             'purchase_cost', 'purchase_date', 'warranty_expiry',
             'depreciation_method', 'useful_life_months', 'salvage_value',
         ];

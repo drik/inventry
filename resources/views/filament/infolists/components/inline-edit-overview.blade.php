@@ -38,6 +38,20 @@
             'options' => \App\Models\Manufacturer::pluck('name', 'id')->toArray(),
         ],
         [
+            'name' => 'model_id',
+            'label' => 'Model',
+            'type' => 'select',
+            'value' => $record->model_id,
+            'options' => \App\Models\AssetModel::pluck('name', 'id')->toArray(),
+        ],
+        [
+            'name' => 'supplier_id',
+            'label' => 'Supplier',
+            'type' => 'select',
+            'value' => $record->supplier_id,
+            'options' => \App\Models\Supplier::pluck('name', 'id')->toArray(),
+        ],
+        [
             'name' => 'status',
             'label' => 'Status',
             'type' => 'select',

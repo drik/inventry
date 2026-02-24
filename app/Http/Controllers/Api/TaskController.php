@@ -97,7 +97,7 @@ class TaskController extends Controller
         $assetIds = $items->pluck('asset_id')->unique()->filter();
         $assets = Asset::withoutGlobalScopes()
             ->whereIn('id', $assetIds)
-            ->with(['category', 'location', 'primaryImage', 'tagValues.tag'])
+            ->with(['category', 'location', 'primaryImage', 'tagValues.tag', 'assetModel', 'supplier'])
             ->get();
 
         // All org asset codes for offline resolution
@@ -143,6 +143,9 @@ class TaskController extends Controller
                 'category_name' => $a->category?->name,
                 'location_name' => $a->location?->name,
                 'status' => $a->status?->value,
+                'model_name' => $a->assetModel?->name,
+                'model_number' => $a->assetModel?->model_number,
+                'supplier_name' => $a->supplier?->name,
                 'primary_image_url' => $a->primaryImage?->file_path
                     ? asset('storage/'.$a->primaryImage->file_path)
                     : null,
@@ -233,6 +236,8 @@ class TaskController extends Controller
                 'name' => $asset->name,
                 'asset_code' => $asset->asset_code,
                 'category_name' => $asset->category?->name,
+                'model_name' => $asset->assetModel?->name,
+                'supplier_name' => $asset->supplier?->name,
                 'primary_image_url' => $asset->primaryImage?->file_path
                     ? asset('storage/'.$asset->primaryImage->file_path)
                     : null,

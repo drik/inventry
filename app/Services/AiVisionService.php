@@ -345,7 +345,7 @@ class AiVisionService
                     ->whereIn('id', $expectedAssetIds)
                     ->whereHas('primaryImage')
                     ->when($locationId, fn ($q) => $q->where('location_id', $locationId))
-                    ->with(['primaryImage', 'category', 'location'])
+                    ->with(['primaryImage', 'category', 'location', 'assetModel'])
                     ->limit($maxCandidates)
                     ->get();
 
@@ -363,7 +363,7 @@ class AiVisionService
                 ->where('location_id', $locationId)
                 ->whereHas('primaryImage')
                 ->whereNotIn('id', $existing)
-                ->with(['primaryImage', 'category', 'location'])
+                ->with(['primaryImage', 'category', 'location', 'assetModel'])
                 ->limit($maxCandidates - $candidates->count())
                 ->get();
 
@@ -379,7 +379,7 @@ class AiVisionService
                 ->where('organization_id', $org->id)
                 ->whereHas('primaryImage')
                 ->whereNotIn('id', $existing)
-                ->with(['primaryImage', 'category', 'location'])
+                ->with(['primaryImage', 'category', 'location', 'assetModel'])
                 ->limit($maxCandidates - $candidates->count())
                 ->get();
 
@@ -409,6 +409,7 @@ class AiVisionService
             'asset_code' => $asset->asset_code,
             'category_name' => $asset->category?->name,
             'location_name' => $asset->location?->name,
+            'model_name' => $asset->assetModel?->name,
             'image_base64' => $imageBase64,
         ];
     }
@@ -530,7 +531,8 @@ PROMPT;
 
             foreach ($candidates as $index => $candidate) {
                 $refKey = 'ref_'.($index + 1);
-                $prompt .= "- {$refKey} ({$candidate['asset_code']}, \"{$candidate['asset_name']}\", {$candidate['category_name']})\n";
+                $modelInfo = ! empty($candidate['model_name']) ? ", modèle: {$candidate['model_name']}" : '';
+                $prompt .= "- {$refKey} ({$candidate['asset_code']}, \"{$candidate['asset_name']}\", {$candidate['category_name']}{$modelInfo})\n";
             }
         } else {
             $prompt .= "\n2. \"matches\" : tableau vide [] (aucune image de référence disponible)\n";
@@ -545,7 +547,7 @@ PROMPT;
     protected function buildVerifyPrompt(Asset $asset): string
     {
         return <<<PROMPT
-Compare la photo capturée (image "captured") avec l'image de référence (image "reference") de l'asset "{$asset->name}" (code: {$asset->asset_code}, catégorie: {$asset->category?->name}).
+Compare la photo capturée (image "captured") avec l'image de référence (image "reference") de l'asset "{$asset->name}" (code: {$asset->asset_code}, catégorie: {$asset->category?->name}{$this->formatModelInfo($asset)}).
 
 Retourne un JSON avec :
 - "is_match" : true si les deux images montrent le même objet physique, false sinon
@@ -553,6 +555,13 @@ Retourne un JSON avec :
 - "reasoning" : explication détaillée de ta conclusion
 - "discrepancies" : tableau des différences observées (vide si correspondance parfaite)
 PROMPT;
+    }
+
+    protected function formatModelInfo(Asset $asset): string
+    {
+        $model = $asset->assetModel?->name;
+
+        return $model ? ", modèle: {$model}" : '';
     }
 
     /**

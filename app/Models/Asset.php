@@ -30,7 +30,7 @@ class Asset extends Model
         'status',
         'purchase_date',
         'purchase_cost',
-        'vendor_id',
+        'supplier_id',
         'warranty_expiry',
         'depreciation_method',
         'useful_life_months',
@@ -115,6 +115,16 @@ class Asset extends Model
     public function manufacturer(): BelongsTo
     {
         return $this->belongsTo(Manufacturer::class);
+    }
+
+    public function assetModel(): BelongsTo
+    {
+        return $this->belongsTo(AssetModel::class, 'model_id');
+    }
+
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(Supplier::class);
     }
 
     public function images(): HasMany

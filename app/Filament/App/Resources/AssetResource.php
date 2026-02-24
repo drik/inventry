@@ -93,6 +93,20 @@ class AssetResource extends Resource
                                             ->preload()
                                             ->nullable(),
 
+                                        Forms\Components\Select::make('model_id')
+                                            ->label('Model')
+                                            ->relationship('assetModel', 'name')
+                                            ->searchable()
+                                            ->preload()
+                                            ->nullable(),
+
+                                        Forms\Components\Select::make('supplier_id')
+                                            ->label('Supplier')
+                                            ->relationship('supplier', 'name')
+                                            ->searchable()
+                                            ->preload()
+                                            ->nullable(),
+
                                         Forms\Components\Select::make('status')
                                             ->options(AssetStatus::class)
                                             ->default(AssetStatus::Available)

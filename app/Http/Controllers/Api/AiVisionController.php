@@ -82,7 +82,7 @@ class AiVisionController extends Controller
             $assetIds = array_map(fn ($m) => $m->assetId, $result['matches']);
             $assets = Asset::withoutGlobalScopes()
                 ->whereIn('id', $assetIds)
-                ->with(['category', 'location', 'primaryImage'])
+                ->with(['category', 'location', 'primaryImage', 'assetModel'])
                 ->get()
                 ->keyBy('id');
 
@@ -107,6 +107,7 @@ class AiVisionController extends Controller
                     'asset_code' => $asset->asset_code,
                     'category_name' => $asset->category?->name,
                     'location_name' => $asset->location?->name,
+                    'model_name' => $asset->assetModel?->name,
                     'primary_image_url' => $asset->primaryImage?->file_path
                         ? asset('storage/'.$asset->primaryImage->file_path)
                         : null,

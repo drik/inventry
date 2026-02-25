@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
+use App\Models\AssetCondition;
 use App\Models\InventoryTask;
 use App\Services\InventoryScanService;
+use App\Services\StorageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -85,13 +87,14 @@ class TaskController extends Controller
         $task = $this->findTask($request, $taskId);
         $session = $task->session;
         $orgId = $request->user()->organization_id;
+        $org = $request->user()->organization;
 
-        // Items scoped to task's location
+        // Items scoped to task's location, with notes, media, and condition
         $itemsQuery = $session->items()->withoutGlobalScopes();
         if ($task->location_id) {
             $itemsQuery->whereHas('asset', fn ($q) => $q->where('location_id', $task->location_id));
         }
-        $items = $itemsQuery->get();
+        $items = $itemsQuery->with(['notes', 'media', 'condition', 'statusChanges'])->get();
 
         // Full asset details for session items
         $assetIds = $items->pluck('asset_id')->unique()->filter();
@@ -111,11 +114,32 @@ class TaskController extends Controller
                 'tag_values' => $a->tagValues->pluck('value')->toArray(),
             ]);
 
+        // Conditions for the org
+        $conditions = AssetCondition::withoutGlobalScopes()
+            ->where('organization_id', $orgId)
+            ->orderBy('sort_order')
+            ->get();
+
+        // Task notes
+        $taskNotes = $task->notes()->with('creator')->get();
+
+        // Storage stats
+        $storageService = app(StorageService::class);
+        $storageStats = $storageService->getUsageStats($org);
+
         return response()->json([
             'task' => [
                 'id' => $task->id,
                 'status' => $task->status,
                 'notes' => $task->notes,
+                'inventory_notes' => $taskNotes->map(fn ($n) => [
+                    'id' => $n->id,
+                    'content' => $n->content,
+                    'source_type' => $n->source_type,
+                    'created_by' => $n->created_by,
+                    'creator_name' => $n->creator?->name,
+                    'created_at' => $n->created_at->toIso8601String(),
+                ]),
             ],
             'session' => [
                 'id' => $session->id,
@@ -134,6 +158,23 @@ class TaskController extends Controller
                 'scanned_at' => $item->scanned_at?->toIso8601String(),
                 'scanned_by' => $item->scanned_by,
                 'condition_notes' => $item->condition_notes,
+                'condition_id' => $item->condition_id,
+                'condition_name' => $item->condition?->name,
+                'status_reason' => $item->statusChanges->first()?->reason,
+                'media' => $item->media->map(fn ($m) => [
+                    'id' => $m->id,
+                    'collection' => $m->collection,
+                    'file_name' => $m->file_name,
+                    'mime_type' => $m->mime_type,
+                    'url' => $m->url,
+                ]),
+                'notes' => $item->notes->map(fn ($n) => [
+                    'id' => $n->id,
+                    'content' => $n->content,
+                    'source_type' => $n->source_type,
+                    'source_media_id' => $n->source_media_id,
+                    'created_at' => $n->created_at->toIso8601String(),
+                ]),
             ]),
             'assets' => $assets->map(fn (Asset $a) => [
                 'id' => $a->id,
@@ -156,7 +197,15 @@ class TaskController extends Controller
                     'encoding_mode' => $tv->encoding_mode?->value,
                 ]),
             ]),
+            'conditions' => $conditions->map(fn ($c) => [
+                'id' => $c->id,
+                'name' => $c->name,
+                'slug' => $c->slug,
+                'color' => $c->color,
+                'icon' => $c->icon,
+            ]),
             'all_asset_barcodes' => $allBarcodes,
+            'storage' => $storageStats,
             'downloaded_at' => now()->toIso8601String(),
         ]);
     }

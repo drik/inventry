@@ -62,6 +62,22 @@ class Organization extends Model implements HasCurrentTenantLabel
                 'sort_order' => 2,
                 'is_system' => true,
             ]);
+
+            // Create default asset conditions
+            foreach (AssetCondition::getDefaultConditions() as $condition) {
+                AssetCondition::withoutGlobalScopes()->create([
+                    'organization_id' => $organization->id,
+                    'is_default' => true,
+                    ...$condition,
+                ]);
+            }
+
+            // Create storage usage tracking
+            StorageUsage::create([
+                'organization_id' => $organization->id,
+                'used_bytes' => 0,
+                'updated_at' => now(),
+            ]);
         });
     }
 
@@ -175,5 +191,20 @@ class Organization extends Model implements HasCurrentTenantLabel
     public function aiUsageLogs(): HasMany
     {
         return $this->hasMany(AiUsageLog::class);
+    }
+
+    public function assetConditions(): HasMany
+    {
+        return $this->hasMany(AssetCondition::class);
+    }
+
+    public function storageUsage(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(StorageUsage::class);
+    }
+
+    public function inventoryReports(): HasMany
+    {
+        return $this->hasMany(InventoryReport::class);
     }
 }

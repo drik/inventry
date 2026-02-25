@@ -152,7 +152,21 @@ curl http://localhost:8000/api/tasks/{taskId}/download \
 **Réponse :**
 ```json
 {
-  "task": { "id": "01HX...", "status": "pending", "notes": null },
+  "task": {
+    "id": "01HX...",
+    "status": "pending",
+    "notes": null,
+    "inventory_notes": [
+      {
+        "id": "01HX...",
+        "content": "Zone A terminée sans anomalies",
+        "source_type": "text",
+        "created_by": "01HX...",
+        "creator_name": "Jean Dupont",
+        "created_at": "2026-02-20T10:35:00+00:00"
+      }
+    ]
+  },
   "session": { "id": "01HX...", "name": "Inventaire Q1", "status": "in_progress" },
   "location": { "id": "01HX...", "name": "Siège - Lomé", "city": "Lomé" },
   "items": [
@@ -162,7 +176,27 @@ curl http://localhost:8000/api/tasks/{taskId}/download \
       "status": "pending",
       "scanned_at": null,
       "scanned_by": null,
-      "condition_notes": null
+      "condition_notes": null,
+      "condition_id": "01HX...",
+      "condition_name": "Bon état",
+      "media": [
+        {
+          "id": "01HX...",
+          "collection": "photos",
+          "file_name": "photo_001.jpg",
+          "mime_type": "image/jpeg",
+          "url": "https://s3.../signed-url"
+        }
+      ],
+      "notes": [
+        {
+          "id": "01HX...",
+          "content": "Écran présente une fissure",
+          "source_type": "text",
+          "source_media_id": null,
+          "created_at": "2026-02-20T10:35:00+00:00"
+        }
+      ]
     }
   ],
   "assets": [
@@ -188,6 +222,10 @@ curl http://localhost:8000/api/tasks/{taskId}/download \
       ]
     }
   ],
+  "conditions": [
+    { "id": "01HX...", "name": "Bon état", "slug": "good", "color": "#22c55e", "icon": "heroicon-o-check-circle" },
+    { "id": "01HX...", "name": "Endommagé", "slug": "damaged", "color": "#ef4444", "icon": "heroicon-o-exclamation-triangle" }
+  ],
   "all_asset_barcodes": [
     {
       "asset_id": "01HX...",
@@ -195,6 +233,13 @@ curl http://localhost:8000/api/tasks/{taskId}/download \
       "tag_values": ["FVFXJ3K1Q6LR", "6340971823"]
     }
   ],
+  "storage": {
+    "used_bytes": 52428800,
+    "quota_bytes": 5368709120,
+    "percentage": 1,
+    "remaining_bytes": 5316280320,
+    "overage_bytes": 0
+  },
   "downloaded_at": "2026-02-23T10:00:00+00:00"
 }
 ```
@@ -285,6 +330,344 @@ curl -X POST http://localhost:8000/api/tasks/{taskId}/unexpected \
 **Réponse 201 :** Item créé avec statut `unexpected`.
 
 **Erreur 422 :** Asset déjà dans la session.
+
+---
+
+## Médias (Photos, Audio, Vidéo)
+
+Upload et gestion de fichiers médias sur les items d'inventaire et les tâches. Stockage S3 avec quotas par plan.
+
+### `POST /api/tasks/{taskId}/items/{itemId}/media`
+
+Ajouter un fichier média à un item d'inventaire.
+
+```bash
+curl -X POST http://localhost:8000/api/tasks/{taskId}/items/{itemId}/media \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json" \
+  -F "file=@/path/to/photo.jpg" \
+  -F "collection=photos"
+```
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `file` | file | **Requis.** Le fichier à uploader (max 50 Mo) |
+| `collection` | string | **Requis.** `photos`, `audio`, ou `video` |
+
+**Types MIME acceptés :**
+- `photos` : jpg, jpeg, png, webp
+- `audio` : mp3, wav, m4a, ogg, webm
+- `video` : mp4, mov, webm
+
+**Réponse 201 :**
+```json
+{
+  "media": {
+    "id": "01HX...",
+    "collection": "photos",
+    "file_name": "photo_001.jpg",
+    "mime_type": "image/jpeg",
+    "size_bytes": 245000,
+    "url": "https://s3.../signed-url",
+    "metadata": {}
+  },
+  "storage": {
+    "used_bytes": 52428800,
+    "quota_bytes": 5368709120,
+    "percentage": 1,
+    "remaining_bytes": 5316280320,
+    "overage_bytes": 0
+  }
+}
+```
+
+**Erreur 422 :** Quota de stockage dépassé ou type de fichier non autorisé.
+
+### `POST /api/tasks/{taskId}/media`
+
+Ajouter un fichier média à une tâche (même format que ci-dessus).
+
+### `GET /api/media/{mediaId}`
+
+Récupérer les informations et l'URL signée d'un média.
+
+```bash
+curl http://localhost:8000/api/media/{mediaId} \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json"
+```
+
+**Réponse 200 :**
+```json
+{
+  "media": {
+    "id": "01HX...",
+    "collection": "photos",
+    "file_name": "photo_001.jpg",
+    "mime_type": "image/jpeg",
+    "size_bytes": 245000,
+    "url": "https://s3.../signed-url",
+    "metadata": {},
+    "created_at": "2026-02-20T10:35:00+00:00"
+  }
+}
+```
+
+### `GET /api/media/{mediaId}/download`
+
+Télécharger un média (redirige vers l'URL signée S3).
+
+### `DELETE /api/media/{mediaId}`
+
+Supprimer un média. Met à jour les quotas de stockage.
+
+---
+
+## Conditions
+
+Gestion des conditions d'assets (personnalisables par organisation). 6 conditions par défaut sont créées à l'inscription.
+
+### `GET /api/conditions`
+
+Liste des conditions de l'organisation.
+
+```bash
+curl http://localhost:8000/api/conditions \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json"
+```
+
+**Réponse 200 :**
+```json
+{
+  "conditions": [
+    { "id": "01HX...", "name": "Neuf", "slug": "new", "color": "#3b82f6", "icon": "heroicon-o-sparkles" },
+    { "id": "01HX...", "name": "Bon état", "slug": "good", "color": "#22c55e", "icon": "heroicon-o-check-circle" },
+    { "id": "01HX...", "name": "Usé", "slug": "worn", "color": "#f59e0b", "icon": "heroicon-o-minus-circle" },
+    { "id": "01HX...", "name": "Endommagé", "slug": "damaged", "color": "#ef4444", "icon": "heroicon-o-exclamation-triangle" },
+    { "id": "01HX...", "name": "Non fonctionnel", "slug": "non_functional", "color": "#dc2626", "icon": "heroicon-o-x-circle" },
+    { "id": "01HX...", "name": "Hors service", "slug": "out_of_service", "color": "#6b7280", "icon": "heroicon-o-no-symbol" }
+  ]
+}
+```
+
+### `PUT /api/tasks/{taskId}/items/{itemId}/condition`
+
+Changer la condition d'un item d'inventaire.
+
+```bash
+curl -X PUT http://localhost:8000/api/tasks/{taskId}/items/{itemId}/condition \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json" \
+  -d '{"condition_id": "01HX..."}'
+```
+
+**Réponse 200 :**
+```json
+{
+  "item": {
+    "id": "01HX...",
+    "condition_id": "01HX...",
+    "condition_name": "Endommagé"
+  }
+}
+```
+
+---
+
+## Statut d'item
+
+### `PUT /api/tasks/{taskId}/items/{itemId}/status`
+
+Changer manuellement le statut de scan d'un item (avec audit trail).
+
+```bash
+curl -X PUT http://localhost:8000/api/tasks/{taskId}/items/{itemId}/status \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json" \
+  -d '{"status": "found", "reason": "Trouvé dans un autre bureau"}'
+```
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `status` | string | **Requis.** `pending`, `found`, `missing`, `unexpected` |
+| `reason` | string | Optionnel. Motif du changement |
+
+**Réponse 200 :**
+```json
+{
+  "item": {
+    "id": "01HX...",
+    "status": "found",
+    "previous_status": "pending"
+  },
+  "change": {
+    "id": "01HX...",
+    "from_status": "pending",
+    "to_status": "found",
+    "reason": "Trouvé dans un autre bureau",
+    "created_at": "2026-02-20T10:35:00+00:00"
+  }
+}
+```
+
+**Erreur 422 :** Statut identique ou statut invalide.
+
+---
+
+## Notes
+
+Notes textuelles sur les items d'inventaire et les tâches. Supportent les notes IA (reformulation, description photo, transcription audio, description vidéo).
+
+### `POST /api/tasks/{taskId}/items/{itemId}/notes`
+
+Ajouter une note à un item.
+
+```bash
+curl -X POST http://localhost:8000/api/tasks/{taskId}/items/{itemId}/notes \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json" \
+  -d '{
+    "content": "L'\''écran présente une fissure en bas à gauche",
+    "source_type": "text"
+  }'
+```
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `content` | string | **Requis.** Contenu de la note |
+| `source_type` | string | Optionnel. `text` (défaut), `ai_rephrase`, `ai_photo_desc`, `ai_audio_transcript`, `ai_video_desc` |
+| `source_media_id` | string | Optionnel. ID du média source (photo/audio/vidéo) |
+| `original_content` | string | Optionnel. Texte original avant reformulation IA |
+
+**Réponse 201 :**
+```json
+{
+  "note": {
+    "id": "01HX...",
+    "content": "L'écran présente une fissure en bas à gauche",
+    "source_type": "text",
+    "source_media_id": null,
+    "original_content": null,
+    "created_by": "01HX...",
+    "created_at": "2026-02-20T10:35:00+00:00"
+  }
+}
+```
+
+### `POST /api/tasks/{taskId}/notes`
+
+Ajouter une note à la tâche (même format).
+
+### `GET /api/tasks/{taskId}/items/{itemId}/notes`
+
+Lister les notes d'un item.
+
+### `GET /api/tasks/{taskId}/notes`
+
+Lister les notes d'une tâche.
+
+### `DELETE /api/notes/{noteId}`
+
+Supprimer une note.
+
+---
+
+## Documents (sur Assets)
+
+Gestion de documents (PDF, Excel, images) attachés aux assets.
+
+### `POST /api/assets/{assetId}/documents`
+
+Uploader un document sur un asset.
+
+```bash
+curl -X POST http://localhost:8000/api/assets/{assetId}/documents \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json" \
+  -F "file=@/path/to/facture.pdf"
+```
+
+**Types MIME acceptés :** pdf, doc, docx, xls, xlsx, jpg, jpeg, png
+
+**Réponse 201 :** Même format que l'upload de média.
+
+### `GET /api/assets/{assetId}/documents`
+
+Lister les documents d'un asset.
+
+**Réponse 200 :**
+```json
+{
+  "documents": [
+    {
+      "id": "01HX...",
+      "file_name": "facture_2026.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 125000,
+      "url": "https://s3.../signed-url",
+      "uploaded_by": "01HX...",
+      "created_at": "2026-02-20T10:35:00+00:00"
+    }
+  ]
+}
+```
+
+---
+
+## Rapports d'inventaire
+
+Génération de rapports de tâche et de session (PDF, Excel, résumé IA).
+
+### `POST /api/tasks/{taskId}/report`
+
+Générer un rapport pour une tâche.
+
+```bash
+curl -X POST http://localhost:8000/api/tasks/{taskId}/report \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json"
+```
+
+**Réponse 201 :**
+```json
+{
+  "report": {
+    "id": "01HX...",
+    "type": "task_report",
+    "title": "Rapport - Tâche Siège Lomé",
+    "summary": null,
+    "data": {
+      "total_expected": 25,
+      "total_found": 22,
+      "total_missing": 2,
+      "total_unexpected": 1,
+      "completion_rate": 88,
+      "conditions": { "good": 18, "damaged": 3, "worn": 1 }
+    },
+    "created_at": "2026-02-20T10:35:00+00:00"
+  }
+}
+```
+
+### `GET /api/tasks/{taskId}/report`
+
+Voir le rapport d'une tâche.
+
+### `GET /api/sessions/{sessionId}/report`
+
+Voir le rapport consolidé d'une session.
+
+### `GET /api/reports/{reportId}/pdf`
+
+Télécharger le rapport en PDF (URL signée S3).
+
+### `GET /api/reports/{reportId}/excel`
+
+Télécharger le rapport en Excel (URL signée S3).
 
 ---
 
@@ -579,6 +962,111 @@ curl -X POST http://localhost:8000/api/tasks/{taskId}/ai-confirm \
 ```
 
 **Erreur 422 :** Asset déjà dans la session (pour `unexpected`).
+
+---
+
+## AI Assistant (Notes IA)
+
+Assistance IA pour les notes d'inventaire : reformulation, description de photo, transcription audio, description vidéo. Utilise Gemini 2.5 Flash (Freemium/Basic/Pro) ou GPT-4o/Whisper (Premium) avec fallback automatique.
+
+**Middlewares :** `throttle:ai-vision`, `plan.limit:max_ai_requests_daily`
+
+### `POST /api/tasks/{taskId}/ai-rephrase`
+
+Reformule un texte de manière professionnelle.
+
+```bash
+curl -X POST http://localhost:8000/api/tasks/{taskId}/ai-rephrase \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json" \
+  -d '{"text": "le pc il est cassé l'\''écran"}'
+```
+
+**Réponse 200 :**
+```json
+{
+  "text": "L'écran de l'ordinateur portable est endommagé.",
+  "usage": {
+    "provider": "gemini",
+    "prompt_tokens": 120,
+    "completion_tokens": 25,
+    "estimated_cost_usd": 0.001
+  }
+}
+```
+
+### `POST /api/tasks/{taskId}/ai-describe-photo`
+
+Décrit une photo prise lors de l'inventaire.
+
+```bash
+curl -X POST http://localhost:8000/api/tasks/{taskId}/ai-describe-photo \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json" \
+  -F "photo=@/path/to/photo.jpg"
+```
+
+**Réponse 200 :**
+```json
+{
+  "description": "Ordinateur portable Dell Latitude avec un écran fissuré en bas à gauche. L'appareil présente des traces d'usure sur le clavier. Numéro de série visible : ABC123.",
+  "media_id": "01HX...",
+  "usage": { "..." }
+}
+```
+
+### `POST /api/tasks/{taskId}/ai-transcribe`
+
+Transcrit un enregistrement audio.
+
+```bash
+curl -X POST http://localhost:8000/api/tasks/{taskId}/ai-transcribe \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json" \
+  -F "audio=@/path/to/recording.m4a"
+```
+
+**Réponse 200 :**
+```json
+{
+  "transcription": "L'imprimante ne s'allume plus depuis ce matin. Le câble d'alimentation semble en bon état.",
+  "media_id": "01HX...",
+  "usage": { "..." }
+}
+```
+
+### `POST /api/tasks/{taskId}/ai-describe-video`
+
+Décrit une courte vidéo.
+
+```bash
+curl -X POST http://localhost:8000/api/tasks/{taskId}/ai-describe-video \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json" \
+  -F "video=@/path/to/video.mp4"
+```
+
+**Réponse 200 :**
+```json
+{
+  "description": "La vidéo montre un agent manipulant un projecteur Epson. L'agent démontre que la lampe ne s'allume pas malgré plusieurs tentatives.",
+  "media_id": "01HX...",
+  "usage": { "..." }
+}
+```
+
+**Erreurs communes IA :** 403 (quota atteint), 429 (rate limit), 422 (fichier invalide).
+
+### Workflow mobile pour notes IA
+
+1. L'agent choisit le mode (texte, photo, audio, vidéo)
+2. Capture/enregistre le contenu
+3. Upload le fichier : `POST /api/tasks/{taskId}/items/{itemId}/media`
+4. Appelle l'endpoint IA : `POST /api/tasks/{taskId}/ai-describe-photo`
+5. L'IA retourne le texte généré
+6. L'agent peut éditer le texte
+7. Crée la note : `POST /api/tasks/{taskId}/items/{itemId}/notes` avec `source_type: "ai_photo_desc"` et `source_media_id`
 
 ---
 

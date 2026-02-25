@@ -5,10 +5,12 @@ namespace App\Filament\App\Resources;
 use App\Enums\InventorySessionStatus;
 use App\Filament\App\Resources\InventorySessionResource\Pages;
 use App\Filament\App\Resources\InventorySessionResource\RelationManagers;
+use App\Models\Asset;
 use App\Models\AssetCategory;
 use App\Models\Department;
 use App\Models\InventorySession;
 use App\Models\Location;
+use Filament\Facades\Filament;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -57,6 +59,7 @@ class InventorySessionResource extends Resource
                             ->multiple()
                             ->searchable()
                             ->preload()
+                            ->live()
                             ->visible(fn (Get $get) => $get('scope_type') !== 'all')
                             ->options(function (Get $get) {
                                 return match ($get('scope_type')) {
@@ -65,6 +68,38 @@ class InventorySessionResource extends Resource
                                     'department' => Department::pluck('name', 'id'),
                                     default => [],
                                 };
+                            }),
+
+                        Forms\Components\Placeholder::make('asset_count_preview')
+                            ->label('Actifs concernés')
+                            ->columnSpanFull()
+                            ->content(function (Get $get) {
+                                $scopeType = $get('scope_type');
+                                $scopeIds = $get('scope_ids') ?? [];
+
+                                $query = Asset::withoutGlobalScopes()
+                                    ->where('organization_id', Filament::getTenant()->id);
+
+                                if ($scopeType !== 'all' && ! empty($scopeIds)) {
+                                    $column = match ($scopeType) {
+                                        'location' => 'location_id',
+                                        'category' => 'category_id',
+                                        'department' => 'department_id',
+                                        default => null,
+                                    };
+
+                                    if ($column) {
+                                        $query->whereIn($column, $scopeIds);
+                                    }
+                                }
+
+                                $count = $query->count();
+
+                                if ($count === 0) {
+                                    return 'Aucun actif ne correspond au périmètre sélectionné.';
+                                }
+
+                                return "{$count} actif(s) seront inclus dans cette session d'inventaire.";
                             }),
                     ])->columns(2),
 
@@ -179,6 +214,7 @@ class InventorySessionResource extends Resource
             'execute' => Pages\ExecuteInventorySession::route('/{record}/execute'),
             'execute-task' => Pages\ExecuteInventoryTask::route('/{record}/execute-task/{taskId}'),
             'execute-task-mobile' => Pages\ExecuteInventoryTaskMobile::route('/{record}/execute-task-mobile/{taskId}'),
+            'report' => Pages\ViewReport::route('/{record}/report'),
         ];
     }
 }

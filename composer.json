@@ -8,6 +8,7 @@
     "require": {
         "php": "^8.2",
         "andreiio/blade-remix-icon": "^3.9",
+        "barryvdh/laravel-dompdf": "^3.1",
         "davidhsianturi/blade-bootstrap-icons": "^2.1",
         "filament/filament": "^3.0",
         "google-gemini-php/laravel": "^2.0",
@@ -17,6 +18,8 @@
         "laravel/framework": "^12.0",
         "laravel/sanctum": "^4.3",
         "laravel/tinker": "^2.10.1",
+        "league/flysystem-aws-s3-v3": "^3.31",
+        "maatwebsite/excel": "^3.1",
         "openai-php/laravel": "^0.18.0",
         "owenvoke/blade-fontawesome": "^2.9"
     },

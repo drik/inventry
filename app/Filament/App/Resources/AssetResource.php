@@ -602,6 +602,34 @@ class AssetResource extends Resource
                                     ->columnSpanFull()
                                     ->placeholder('No notes.'),
                             ]),
+
+                        Infolists\Components\Tabs\Tab::make('Documents')
+                            ->icon('heroicon-o-paper-clip')
+                            ->badge(fn ($record) => $record->documents()->count())
+                            ->schema([
+                                Infolists\Components\RepeatableEntry::make('documents')
+                                    ->hiddenLabel()
+                                    ->schema([
+                                        Infolists\Components\TextEntry::make('file_name')
+                                            ->label('Fichier'),
+
+                                        Infolists\Components\TextEntry::make('mime_type')
+                                            ->label('Type')
+                                            ->badge(),
+
+                                        Infolists\Components\TextEntry::make('human_size')
+                                            ->label('Taille'),
+
+                                        Infolists\Components\TextEntry::make('uploader.name')
+                                            ->label('Ajouté par'),
+
+                                        Infolists\Components\TextEntry::make('created_at')
+                                            ->label('Date')
+                                            ->dateTime('d/m/Y H:i'),
+                                    ])
+                                    ->columns(5)
+                                    ->columnSpanFull(),
+                            ]),
                     ])->columnSpanFull(),
             ]);
     }

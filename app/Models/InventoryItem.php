@@ -4,14 +4,17 @@ namespace App\Models;
 
 use App\Enums\InventoryItemStatus;
 use App\Models\Concerns\BelongsToOrganization;
+use App\Models\Concerns\HasMedia;
+use App\Models\Concerns\HasNotes;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class InventoryItem extends Model
 {
-    use BelongsToOrganization, HasFactory, HasUlids;
+    use BelongsToOrganization, HasFactory, HasMedia, HasNotes, HasUlids;
 
     protected $fillable = [
         'organization_id',
@@ -22,6 +25,7 @@ class InventoryItem extends Model
         'scanned_at',
         'scanned_by',
         'condition_notes',
+        'condition_id',
         'identification_method',
         'ai_recognition_log_id',
         'ai_confidence',
@@ -61,5 +65,15 @@ class InventoryItem extends Model
     public function aiRecognitionLog(): BelongsTo
     {
         return $this->belongsTo(AiRecognitionLog::class);
+    }
+
+    public function condition(): BelongsTo
+    {
+        return $this->belongsTo(AssetCondition::class, 'condition_id');
+    }
+
+    public function statusChanges(): HasMany
+    {
+        return $this->hasMany(InventoryItemStatusChange::class)->orderByDesc('created_at');
     }
 }

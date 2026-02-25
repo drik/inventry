@@ -11,6 +11,7 @@ use App\Models\InventoryTask;
 use App\Models\Location;
 use App\Models\Organization;
 use App\Models\Plan;
+use App\Models\StorageUsage;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 
@@ -52,6 +53,9 @@ class PlanLimitService
                 ->whereMonth('created_at', now()->month)
                 ->whereYear('created_at', now()->year)
                 ->count(),
+            PlanFeature::MaxStorageMb => (int) ceil(
+                (StorageUsage::where('organization_id', $org->id)->value('used_bytes') ?? 0) / 1048576
+            ),
             PlanFeature::MaxOrganizations => 0, // Handled separately via canCreateOrganization
             default => 0,
         };

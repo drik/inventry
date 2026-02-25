@@ -29,6 +29,36 @@
       "key": "recognition_log_id",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "item_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "media_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "note_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "report_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "session_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "condition_id",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
@@ -763,6 +793,565 @@
         }
       ],
       "description": "Reconnaissance d'assets par intelligence artificielle.\n\nProviders : Gemini Flash (Freemium/Basic/Pro), GPT-4o (Premium).\nFallback automatique si confiance < 0.5 (Basic/Pro).\n\nFlux typique :\n1. AI Identify → obtenir suggestions\n2. AI Confirm (matched/unexpected/dismissed) → valider ou rejeter"
+    },
+    {
+      "name": "Media",
+      "item": [
+        {
+          "name": "Upload Media to Item",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.test('Media uploaded', function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData).to.have.property('media');",
+                  "        pm.expect(jsonData).to.have.property('storage');",
+                  "        pm.collectionVariables.set('media_id', jsonData.media.id);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": "", "description": "Fichier (photo, audio ou vidéo)" },
+                { "key": "collection", "value": "photos", "type": "text", "description": "photos, audio, ou video" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/items/{{item_id}}/media",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "items", "{{item_id}}", "media"]
+            },
+            "description": "Upload un fichier média sur un item d'inventaire.\n\nCollections : photos (jpg/png/webp), audio (mp3/wav/m4a/ogg/webm), video (mp4/mov/webm)\n\nMax 50 Mo par fichier. Vérifie le quota de stockage."
+          }
+        },
+        {
+          "name": "Upload Media to Task",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": "" },
+                { "key": "collection", "value": "photos", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/media",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "media"]
+            },
+            "description": "Upload un fichier média sur la tâche."
+          }
+        },
+        {
+          "name": "Get Media",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/media/{{media_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["media", "{{media_id}}"]
+            },
+            "description": "Récupère les infos et l'URL signée d'un média."
+          }
+        },
+        {
+          "name": "Download Media",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/media/{{media_id}}/download",
+              "host": ["{{base_url}}"],
+              "path": ["media", "{{media_id}}", "download"]
+            },
+            "description": "Télécharge le média (redirige vers URL signée S3)."
+          }
+        },
+        {
+          "name": "Delete Media",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/media/{{media_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["media", "{{media_id}}"]
+            },
+            "description": "Supprime un média et met à jour les quotas de stockage."
+          }
+        }
+      ],
+      "description": "Gestion des fichiers médias (photos, audio, vidéo) sur items et tâches. Stockage S3 avec quotas par plan."
+    },
+    {
+      "name": "Conditions",
+      "item": [
+        {
+          "name": "List Conditions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Conditions returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('conditions');",
+                  "    if (jsonData.conditions.length > 0) {",
+                  "        pm.collectionVariables.set('condition_id', jsonData.conditions[0].id);",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/conditions",
+              "host": ["{{base_url}}"],
+              "path": ["conditions"]
+            },
+            "description": "Liste les conditions d'assets de l'organisation.\n\n6 conditions par défaut : Neuf, Bon état, Usé, Endommagé, Non fonctionnel, Hors service."
+          }
+        },
+        {
+          "name": "Update Item Condition",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"condition_id\": \"{{condition_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/items/{{item_id}}/condition",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "items", "{{item_id}}", "condition"]
+            },
+            "description": "Change la condition d'un item d'inventaire."
+          }
+        }
+      ],
+      "description": "Conditions d'assets personnalisables par organisation"
+    },
+    {
+      "name": "Item Status",
+      "item": [
+        {
+          "name": "Change Item Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"found\",\n  \"reason\": \"Trouvé dans un autre bureau\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/items/{{item_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "items", "{{item_id}}", "status"]
+            },
+            "description": "Change manuellement le statut d'un item (pending, found, missing, unexpected).\n\nCrée un enregistrement d'audit trail avec le motif du changement."
+          }
+        }
+      ],
+      "description": "Changement de statut manuel des items avec audit trail"
+    },
+    {
+      "name": "Notes",
+      "item": [
+        {
+          "name": "Add Note to Item",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.test('Note created', function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData).to.have.property('note');",
+                  "        pm.collectionVariables.set('note_id', jsonData.note.id);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"L'écran présente une fissure en bas à gauche\",\n  \"source_type\": \"text\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/items/{{item_id}}/notes",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "items", "{{item_id}}", "notes"]
+            },
+            "description": "Ajoute une note textuelle à un item.\n\nsource_type : text (défaut), ai_rephrase, ai_photo_desc, ai_audio_transcript, ai_video_desc\n\nPour les notes IA, fournir aussi source_media_id et original_content."
+          }
+        },
+        {
+          "name": "Add Note to Task",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Zone A terminée sans anomalies\",\n  \"source_type\": \"text\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/notes",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "notes"]
+            },
+            "description": "Ajoute une note textuelle à la tâche."
+          }
+        },
+        {
+          "name": "List Item Notes",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/items/{{item_id}}/notes",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "items", "{{item_id}}", "notes"]
+            },
+            "description": "Liste les notes d'un item d'inventaire."
+          }
+        },
+        {
+          "name": "List Task Notes",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/notes",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "notes"]
+            },
+            "description": "Liste les notes de la tâche."
+          }
+        },
+        {
+          "name": "Delete Note",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notes/{{note_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["notes", "{{note_id}}"]
+            },
+            "description": "Supprime une note."
+          }
+        }
+      ],
+      "description": "Notes textuelles sur items et tâches. Support des notes IA (reformulation, description photo, transcription audio, description vidéo)."
+    },
+    {
+      "name": "AI Assistant",
+      "item": [
+        {
+          "name": "AI Rephrase Text",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"le pc il est cassé l'écran\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/ai-rephrase",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "ai-rephrase"]
+            },
+            "description": "Reformule un texte de manière professionnelle.\n\nMiddlewares : throttle:ai-vision, plan.limit:max_ai_requests_daily"
+          }
+        },
+        {
+          "name": "AI Describe Photo",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "photo", "type": "file", "src": "", "description": "Photo à décrire (JPEG/PNG, max 10 Mo)" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/ai-describe-photo",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "ai-describe-photo"]
+            },
+            "description": "Décrit une photo prise lors de l'inventaire (état physique, détails identifiants, environnement)."
+          }
+        },
+        {
+          "name": "AI Transcribe Audio",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "audio", "type": "file", "src": "", "description": "Enregistrement audio (MP3/WAV/M4A, max 50 Mo)" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/ai-transcribe",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "ai-transcribe"]
+            },
+            "description": "Transcrit un enregistrement audio (note vocale d'agent d'inventaire)."
+          }
+        },
+        {
+          "name": "AI Describe Video",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "video", "type": "file", "src": "", "description": "Courte vidéo (MP4/MOV/WebM, max 50 Mo)" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/ai-describe-video",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "ai-describe-video"]
+            },
+            "description": "Décrit une courte vidéo prise lors de l'inventaire (état de l'objet, défauts, démonstrations)."
+          }
+        }
+      ],
+      "description": "Assistant IA pour les notes d'inventaire.\n\n4 modes : reformulation, description photo, transcription audio, description vidéo.\n\nProviders : Gemini 2.5 Flash (Freemium/Basic/Pro), GPT-4o/Whisper (Premium)."
+    },
+    {
+      "name": "Documents",
+      "item": [
+        {
+          "name": "Upload Document to Asset",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": "", "description": "Document (PDF, DOC, XLS, JPG, PNG)" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/assets/{{asset_id}}/documents",
+              "host": ["{{base_url}}"],
+              "path": ["assets", "{{asset_id}}", "documents"]
+            },
+            "description": "Upload un document sur un asset.\n\nTypes acceptés : pdf, doc, docx, xls, xlsx, jpg, jpeg, png"
+          }
+        },
+        {
+          "name": "List Asset Documents",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/assets/{{asset_id}}/documents",
+              "host": ["{{base_url}}"],
+              "path": ["assets", "{{asset_id}}", "documents"]
+            },
+            "description": "Liste les documents attachés à un asset."
+          }
+        }
+      ],
+      "description": "Gestion documentaire sur les assets (factures, garanties, manuels, photos)"
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "Generate Task Report",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.test('Report generated', function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData).to.have.property('report');",
+                  "        pm.collectionVariables.set('report_id', jsonData.report.id);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/report",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "report"]
+            },
+            "description": "Génère un rapport d'inventaire pour la tâche.\n\nInclut : statistiques (attendus, trouvés, manquants, inattendus), répartition par condition, taux de complétion."
+          }
+        },
+        {
+          "name": "Show Task Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/report",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}", "report"]
+            },
+            "description": "Affiche le rapport d'une tâche."
+          }
+        },
+        {
+          "name": "Show Session Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/sessions/{{session_id}}/report",
+              "host": ["{{base_url}}"],
+              "path": ["sessions", "{{session_id}}", "report"]
+            },
+            "description": "Affiche le rapport consolidé d'une session d'inventaire."
+          }
+        },
+        {
+          "name": "Download Report PDF",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/reports/{{report_id}}/pdf",
+              "host": ["{{base_url}}"],
+              "path": ["reports", "{{report_id}}", "pdf"]
+            },
+            "description": "Télécharge le rapport en PDF (URL signée S3).\n\nGénère le PDF à la première demande si pas encore créé."
+          }
+        },
+        {
+          "name": "Download Report Excel",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/reports/{{report_id}}/excel",
+              "host": ["{{base_url}}"],
+              "path": ["reports", "{{report_id}}", "excel"]
+            },
+            "description": "Télécharge le rapport en Excel (URL signée S3).\n\nGénère l'Excel à la première demande si pas encore créé."
+          }
+        }
+      ],
+      "description": "Rapports d'inventaire (tâche et session).\n\nFormats : PDF (DomPDF), Excel (Maatwebsite).\n\nRésumé IA disponible via le panel Filament."
     },
     {
       "name": "Sync",

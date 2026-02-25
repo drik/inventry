@@ -15,6 +15,7 @@ enum PlanFeature: string implements HasLabel
     case MaxTasksPerSession = 'max_tasks_per_session';
     case MaxAiRequestsDaily = 'max_ai_requests_daily';
     case MaxAiRequestsMonthly = 'max_ai_requests_monthly';
+    case MaxStorageMb = 'max_storage_mb';
 
     // Boolean features
     case HasApiAccess = 'has_api_access';
@@ -34,6 +35,7 @@ enum PlanFeature: string implements HasLabel
             self::MaxTasksPerSession => 'Tâches par session',
             self::MaxAiRequestsDaily => 'Requêtes IA / jour',
             self::MaxAiRequestsMonthly => 'Requêtes IA / mois',
+            self::MaxStorageMb => 'Stockage (Mo)',
             self::HasApiAccess => 'Accès API mobile',
             self::HasCustomIntegrations => 'Intégrations sur mesure',
             self::HasAdvancedAnalytics => 'Analyses avancées',
@@ -53,6 +55,7 @@ enum PlanFeature: string implements HasLabel
             self::MaxTasksPerSession,
             self::MaxAiRequestsDaily,
             self::MaxAiRequestsMonthly,
+            self::MaxStorageMb,
         ]);
     }
 
@@ -70,6 +73,7 @@ enum PlanFeature: string implements HasLabel
             self::MaxActiveInventorySessions => \App\Models\InventorySession::class,
             self::MaxTasksPerSession => \App\Models\InventoryTask::class,
             self::MaxAiRequestsDaily, self::MaxAiRequestsMonthly => \App\Models\AiUsageLog::class,
+            self::MaxStorageMb => \App\Models\StorageUsage::class,
             default => null,
         };
     }

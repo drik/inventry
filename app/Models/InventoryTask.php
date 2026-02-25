@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToOrganization;
+use App\Models\Concerns\HasMedia;
+use App\Models\Concerns\HasNotes;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class InventoryTask extends Model
 {
-    use BelongsToOrganization, HasFactory, HasUlids;
+    use BelongsToOrganization, HasFactory, HasMedia, HasNotes, HasUlids;
 
     protected $fillable = [
         'organization_id',

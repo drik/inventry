@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\InventoryItemStatus;
 use App\Models\Asset;
 use App\Models\InventoryItem;
+use App\Models\InventoryItemStatusChange;
 use App\Models\InventorySession;
 use App\Models\InventoryTask;
 use App\Notifications\InventoryTaskCompleted;
@@ -169,6 +170,32 @@ class InventoryScanService
         }
 
         $this->refreshSessionCounters($task->session);
+    }
+
+    /**
+     * Change the status of an inventory item manually with audit trail.
+     */
+    public function changeItemStatus(
+        InventoryItem $item,
+        InventoryItemStatus $newStatus,
+        string $userId,
+        ?string $reason = null,
+    ): void {
+        $fromStatus = $item->status->value;
+
+        InventoryItemStatusChange::create([
+            'organization_id' => $item->organization_id,
+            'inventory_item_id' => $item->id,
+            'from_status' => $fromStatus,
+            'to_status' => $newStatus->value,
+            'changed_by' => $userId,
+            'reason' => $reason,
+            'created_at' => now(),
+        ]);
+
+        $item->update(['status' => $newStatus]);
+
+        $this->refreshSessionCounters($item->session);
     }
 
     /**

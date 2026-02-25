@@ -6,9 +6,12 @@ use App\Enums\InventoryItemStatus;
 use App\Enums\InventorySessionStatus;
 use App\Filament\App\Resources\InventorySessionResource;
 use App\Models\Asset;
+use App\Models\InventoryReport;
 use App\Notifications\InventoryTaskAssigned;
+use App\Services\InventoryReportService;
 use Filament\Actions;
 use Filament\Facades\Filament;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewInventorySession extends ViewRecord
@@ -115,6 +118,31 @@ class ViewInventorySession extends ViewRecord
                     ]);
                 })
                 ->successNotificationTitle('Session cancelled'),
+
+            Actions\Action::make('generate_report')
+                ->label('Générer le rapport')
+                ->icon('heroicon-o-document-chart-bar')
+                ->color('info')
+                ->visible(fn () => $this->record->status === InventorySessionStatus::Completed)
+                ->requiresConfirmation()
+                ->modalDescription('Générer un rapport consolidé pour cette session d\'inventaire ?')
+                ->action(function (): void {
+                    $reportService = app(InventoryReportService::class);
+                    $reportService->generateSessionReport($this->record, auth()->id());
+
+                    Notification::make()
+                        ->title('Rapport généré')
+                        ->success()
+                        ->send();
+                }),
+
+            Actions\Action::make('view_report')
+                ->label('Voir le rapport')
+                ->icon('heroicon-o-eye')
+                ->color('gray')
+                ->visible(fn () => InventoryReport::where('session_id', $this->record->id)
+                    ->where('type', 'session_report')->exists())
+                ->url(fn () => InventorySessionResource::getUrl('report', ['record' => $this->record])),
 
             Actions\EditAction::make()
                 ->visible(fn () => $this->record->status === InventorySessionStatus::Draft),

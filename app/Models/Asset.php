@@ -5,18 +5,18 @@ namespace App\Models;
 use App\Enums\AssetStatus;
 use App\Enums\DepreciationMethod;
 use App\Models\Concerns\BelongsToOrganization;
+use App\Models\Concerns\HasMedia;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Asset extends Model
 {
-    use BelongsToOrganization, HasFactory, HasUlids, SoftDeletes;
+    use BelongsToOrganization, HasFactory, HasMedia, HasUlids, SoftDeletes;
 
     protected $fillable = [
         'organization_id',

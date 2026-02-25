@@ -114,9 +114,9 @@ class TaskController extends Controller
                 'tag_values' => $a->tagValues->pluck('value')->toArray(),
             ]);
 
-        // Conditions for the org
+        // Conditions for the org (global + org-specific)
         $conditions = AssetCondition::withoutGlobalScopes()
-            ->where('organization_id', $orgId)
+            ->where(fn ($q) => $q->whereNull('organization_id')->orWhere('organization_id', $orgId))
             ->orderBy('sort_order')
             ->get();
 

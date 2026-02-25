@@ -2,15 +2,17 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\BelongsToOrganization;
+use Filament\Facades\Filament;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AssetCondition extends Model
 {
-    use BelongsToOrganization, HasFactory, HasUlids;
+    use HasFactory, HasUlids;
 
     protected $fillable = [
         'organization_id',
@@ -29,6 +31,40 @@ class AssetCondition extends Model
             'sort_order' => 'integer',
             'is_default' => 'boolean',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        // Same pattern as Manufacturer: show global (null) + org-specific
+        static::addGlobalScope('organization', function (Builder $builder) {
+            $tenant = Filament::getTenant();
+
+            if ($tenant) {
+                $builder->where(function (Builder $query) use ($tenant) {
+                    $query->whereNull('asset_conditions.organization_id')
+                        ->orWhere('asset_conditions.organization_id', $tenant->id);
+                });
+            }
+        });
+
+        static::creating(function ($model) {
+            if (! $model->organization_id) {
+                $tenant = Filament::getTenant();
+                if ($tenant) {
+                    $model->organization_id = $tenant->id;
+                }
+            }
+        });
+    }
+
+    public function isDefault(): bool
+    {
+        return $this->organization_id === null;
+    }
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
     }
 
     public function inventoryItems(): HasMany

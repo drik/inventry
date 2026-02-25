@@ -59,7 +59,23 @@ class AiUsageLogResource extends Resource
                         'ai_identify' => 'primary',
                         'ai_verify' => 'info',
                         'ai_match' => 'warning',
+                        'assistant_rephrase' => 'success',
+                        'assistant_describe_photo' => 'primary',
+                        'assistant_transcribe' => 'warning',
+                        'assistant_describe_video' => 'success',
+                        'assistant_generate_text' => 'info',
                         default => 'gray',
+                    })
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'ai_identify' => 'Vision - Identification',
+                        'ai_verify' => 'Vision - Vérification',
+                        'ai_match' => 'Vision - Correspondance',
+                        'assistant_rephrase' => 'Assistant - Reformulation',
+                        'assistant_describe_photo' => 'Assistant - Description photo',
+                        'assistant_transcribe' => 'Assistant - Transcription',
+                        'assistant_describe_video' => 'Assistant - Description vidéo',
+                        'assistant_generate_text' => 'Assistant - Génération texte',
+                        default => $state,
                     })
                     ->sortable(),
 
@@ -79,12 +95,16 @@ class AiUsageLogResource extends Resource
 
                 Tables\Filters\SelectFilter::make('feature')
                     ->label('Fonctionnalité')
-                    ->options(
-                        AiUsageLog::query()
-                            ->distinct()
-                            ->pluck('feature', 'feature')
-                            ->toArray()
-                    ),
+                    ->options([
+                        'ai_identify' => 'Vision - Identification',
+                        'ai_verify' => 'Vision - Vérification',
+                        'ai_match' => 'Vision - Correspondance',
+                        'assistant_rephrase' => 'Assistant - Reformulation',
+                        'assistant_describe_photo' => 'Assistant - Description photo',
+                        'assistant_transcribe' => 'Assistant - Transcription',
+                        'assistant_describe_video' => 'Assistant - Description vidéo',
+                        'assistant_generate_text' => 'Assistant - Génération texte',
+                    ]),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
@@ -105,7 +125,29 @@ class AiUsageLogResource extends Resource
 
                         Infolists\Components\TextEntry::make('feature')
                             ->label('Fonctionnalité')
-                            ->badge(),
+                            ->badge()
+                            ->color(fn (string $state): string => match ($state) {
+                                'ai_identify' => 'primary',
+                                'ai_verify' => 'info',
+                                'ai_match' => 'warning',
+                                'assistant_rephrase' => 'success',
+                                'assistant_describe_photo' => 'primary',
+                                'assistant_transcribe' => 'warning',
+                                'assistant_describe_video' => 'success',
+                                'assistant_generate_text' => 'info',
+                                default => 'gray',
+                            })
+                            ->formatStateUsing(fn (string $state): string => match ($state) {
+                                'ai_identify' => 'Vision - Identification',
+                                'ai_verify' => 'Vision - Vérification',
+                                'ai_match' => 'Vision - Correspondance',
+                                'assistant_rephrase' => 'Assistant - Reformulation',
+                                'assistant_describe_photo' => 'Assistant - Description photo',
+                                'assistant_transcribe' => 'Assistant - Transcription',
+                                'assistant_describe_video' => 'Assistant - Description vidéo',
+                                'assistant_generate_text' => 'Assistant - Génération texte',
+                                default => $state,
+                            }),
 
                         Infolists\Components\TextEntry::make('tokens_used')
                             ->label('Tokens utilisés')

@@ -63,15 +63,6 @@ class Organization extends Model implements HasCurrentTenantLabel
                 'is_system' => true,
             ]);
 
-            // Create default asset conditions
-            foreach (AssetCondition::getDefaultConditions() as $condition) {
-                AssetCondition::withoutGlobalScopes()->create([
-                    'organization_id' => $organization->id,
-                    'is_default' => true,
-                    ...$condition,
-                ]);
-            }
-
             // Create storage usage tracking
             StorageUsage::create([
                 'organization_id' => $organization->id,

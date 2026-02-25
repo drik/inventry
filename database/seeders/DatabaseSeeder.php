@@ -12,6 +12,7 @@ class DatabaseSeeder extends Seeder
             PlanSeeder::class,
             CreateAdminSeeder::class,
             DefaultManufacturerSeeder::class,
+            DefaultAssetConditionSeeder::class,
             DemoDataSeeder::class,
         ]);
     }

@@ -17,7 +17,7 @@ class ConditionController extends Controller
     public function index(Request $request): JsonResponse
     {
         $conditions = AssetCondition::withoutGlobalScopes()
-            ->where('organization_id', $request->user()->organization_id)
+            ->where(fn ($q) => $q->whereNull('organization_id')->orWhere('organization_id', $request->user()->organization_id))
             ->orderBy('sort_order')
             ->get();
 
@@ -50,9 +50,9 @@ class ConditionController extends Controller
             ->where(fn ($q) => $q->where('id', $itemId)->orWhere('asset_id', $itemId))
             ->firstOrFail();
 
-        // Verify condition belongs to the org
+        // Verify condition belongs to the org or is global
         $condition = AssetCondition::withoutGlobalScopes()
-            ->where('organization_id', $request->user()->organization_id)
+            ->where(fn ($q) => $q->whereNull('organization_id')->orWhere('organization_id', $request->user()->organization_id))
             ->findOrFail($request->input('condition_id'));
 
         $item->update(['condition_id' => $condition->id]);

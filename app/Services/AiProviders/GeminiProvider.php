@@ -49,7 +49,7 @@ class GeminiProvider implements AiProviderInterface
         $completionTokens = $usage?->candidatesTokenCount ?? 0;
 
         return new AiProviderResponse(
-            text: $response->text() ?? '',
+            text: $this->safeExtractText($response),
             promptTokens: $promptTokens,
             completionTokens: $completionTokens,
             estimatedCostUsd: $this->estimateCost($promptTokens, $completionTokens),
@@ -91,7 +91,7 @@ class GeminiProvider implements AiProviderInterface
         $completionTokens = $usage?->candidatesTokenCount ?? 0;
 
         return new AiProviderResponse(
-            text: $response->text() ?? '',
+            text: $this->safeExtractText($response),
             promptTokens: $promptTokens,
             completionTokens: $completionTokens,
             estimatedCostUsd: $this->estimateCost($promptTokens, $completionTokens),
@@ -137,7 +137,7 @@ class GeminiProvider implements AiProviderInterface
         $completionTokens = $usage?->candidatesTokenCount ?? 0;
 
         return new AiProviderResponse(
-            text: $response->text() ?? '',
+            text: $this->safeExtractText($response),
             promptTokens: $promptTokens,
             completionTokens: $completionTokens,
             estimatedCostUsd: $this->estimateCost($promptTokens, $completionTokens),
@@ -181,7 +181,7 @@ class GeminiProvider implements AiProviderInterface
         $completionTokens = $usage?->candidatesTokenCount ?? 0;
 
         return new AiProviderResponse(
-            text: $response->text() ?? '',
+            text: $this->safeExtractText($response),
             promptTokens: $promptTokens,
             completionTokens: $completionTokens,
             estimatedCostUsd: $this->estimateCost($promptTokens, $completionTokens),
@@ -191,6 +191,20 @@ class GeminiProvider implements AiProviderInterface
     public function getProviderName(): string
     {
         return 'gemini';
+    }
+
+    protected function safeExtractText($response): string
+    {
+        try {
+            return $response->text() ?? '';
+        } catch (\ValueError $e) {
+            // Response was blocked by safety filters or returned no valid parts
+            throw new \RuntimeException(
+                'Le contenu a été bloqué par les filtres de sécurité de l\'IA. Veuillez réessayer avec un autre fichier.',
+                422,
+                $e
+            );
+        }
     }
 
     protected function estimateCost(int $promptTokens, int $completionTokens): float

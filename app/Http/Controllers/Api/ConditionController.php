@@ -62,6 +62,7 @@ class ConditionController extends Controller
                 'id' => $item->id,
                 'condition_id' => $item->condition_id,
                 'condition_name' => $condition->name,
+                'condition_color' => $condition->color,
             ],
         ]);
     }

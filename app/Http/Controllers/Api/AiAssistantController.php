@@ -33,11 +33,15 @@ class AiAssistantController extends Controller
             return response()->json(['message' => 'Quota IA atteint. Passez à un plan supérieur.'], 429);
         }
 
-        $result = $this->aiService->rephraseText(
-            $request->input('text'),
-            $org,
-            $request->user()->id,
-        );
+        try {
+            $result = $this->aiService->rephraseText(
+                $request->input('text'),
+                $org,
+                $request->user()->id,
+            );
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], $e->getCode() ?: 422);
+        }
 
         return response()->json([
             'text' => $result->text,
@@ -75,12 +79,16 @@ class AiAssistantController extends Controller
             $request->user()->id,
         );
 
-        $result = $this->aiService->describePhoto(
-            $media->file_path,
-            $org,
-            $request->user()->id,
-            $media->disk,
-        );
+        try {
+            $result = $this->aiService->describePhoto(
+                $media->file_path,
+                $org,
+                $request->user()->id,
+                $media->disk,
+            );
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], $e->getCode() ?: 422);
+        }
 
         return response()->json([
             'description' => $result->text,
@@ -126,13 +134,17 @@ class AiAssistantController extends Controller
             $request->user()->id,
         );
 
-        $result = $this->aiService->transcribeAudio(
-            $media->file_path,
-            $org,
-            $request->user()->id,
-            $media->disk,
-            $media->mime_type,
-        );
+        try {
+            $result = $this->aiService->transcribeAudio(
+                $media->file_path,
+                $org,
+                $request->user()->id,
+                $media->disk,
+                $media->mime_type,
+            );
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], $e->getCode() ?: 422);
+        }
 
         return response()->json([
             'transcription' => $result->text,
@@ -178,13 +190,17 @@ class AiAssistantController extends Controller
             $request->user()->id,
         );
 
-        $result = $this->aiService->describeVideo(
-            $media->file_path,
-            $org,
-            $request->user()->id,
-            $media->disk,
-            $media->mime_type,
-        );
+        try {
+            $result = $this->aiService->describeVideo(
+                $media->file_path,
+                $org,
+                $request->user()->id,
+                $media->disk,
+                $media->mime_type,
+            );
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], $e->getCode() ?: 422);
+        }
 
         return response()->json([
             'description' => $result->text,

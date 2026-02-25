@@ -160,6 +160,7 @@ class TaskController extends Controller
                 'condition_notes' => $item->condition_notes,
                 'condition_id' => $item->condition_id,
                 'condition_name' => $item->condition?->name,
+                'condition_color' => $item->condition?->color,
                 'status_reason' => $item->statusChanges->first()?->reason,
                 'media' => $item->media->map(fn ($m) => [
                     'id' => $m->id,

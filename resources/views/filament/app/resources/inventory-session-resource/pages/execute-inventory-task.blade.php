@@ -195,6 +195,7 @@
                                 <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Name</th>
                                 <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Location</th>
                                 <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Status</th>
+                                <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Attachments</th>
                                 <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Scanned</th>
                                 <th class="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Actions</th>
                             </tr>
@@ -215,6 +216,30 @@
                                         <x-filament::badge :color="$item->status->getColor()" :icon="$item->status->getIcon()">
                                             {{ $item->status->getLabel() }}
                                         </x-filament::badge>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        @if($item->notes_count > 0 || $item->media_count > 0)
+                                            <button
+                                                wire:click="showItemDetails('{{ $item->id }}')"
+                                                class="inline-flex items-center gap-1.5 text-xs"
+                                                type="button"
+                                            >
+                                                @if($item->notes_count > 0)
+                                                    <span class="inline-flex items-center gap-0.5 rounded-full bg-blue-50 px-2 py-0.5 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400">
+                                                        <x-heroicon-o-pencil-square class="h-3 w-3" />
+                                                        {{ $item->notes_count }}
+                                                    </span>
+                                                @endif
+                                                @if($item->media_count > 0)
+                                                    <span class="inline-flex items-center gap-0.5 rounded-full bg-green-50 px-2 py-0.5 text-green-700 dark:bg-green-500/10 dark:text-green-400">
+                                                        <x-heroicon-o-paper-clip class="h-3 w-3" />
+                                                        {{ $item->media_count }}
+                                                    </span>
+                                                @endif
+                                            </button>
+                                        @else
+                                            <span class="text-xs text-gray-400">—</span>
+                                        @endif
                                     </td>
                                     <td class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">
                                         {{ $item->scanned_at?->diffForHumans() ?? '—' }}
@@ -244,7 +269,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                                    <td colspan="7" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                                         No items found for this filter.
                                     </td>
                                 </tr>
@@ -292,6 +317,90 @@
                 </div>
             @endif
 
+            {{-- Task Notes --}}
+            @if($this->taskNotes->isNotEmpty())
+                <div class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+                    <h3 class="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+                        <x-heroicon-o-pencil-square class="h-4 w-4 text-gray-500" />
+                        Notes de la tache ({{ $this->taskNotes->count() }})
+                    </h3>
+                    <div class="space-y-2 max-h-60 overflow-y-auto">
+                        @foreach($this->taskNotes as $note)
+                            <div class="rounded-lg border border-gray-200 p-2 dark:border-white/10">
+                                <div class="mb-1 flex items-center gap-2">
+                                    @php
+                                        $sourceColor = match($note->source_type) {
+                                            'text' => 'gray',
+                                            'ai_rephrase' => 'success',
+                                            'ai_photo_desc' => 'primary',
+                                            'ai_audio_transcript' => 'warning',
+                                            'ai_video_desc' => 'info',
+                                            default => 'gray',
+                                        };
+                                        $sourceLabel = match($note->source_type) {
+                                            'text' => 'Texte',
+                                            'ai_rephrase' => 'IA',
+                                            'ai_photo_desc' => 'Photo',
+                                            'ai_audio_transcript' => 'Audio',
+                                            'ai_video_desc' => 'Video',
+                                            default => $note->source_type,
+                                        };
+                                    @endphp
+                                    <x-filament::badge :color="$sourceColor" size="sm">
+                                        {{ $sourceLabel }}
+                                    </x-filament::badge>
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">
+                                        {{ $note->created_at->diffForHumans() }}
+                                    </span>
+                                </div>
+                                <p class="text-xs text-gray-700 dark:text-gray-300 line-clamp-3">{{ $note->content }}</p>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
+            {{-- Task Media --}}
+            @if($this->taskMedia->isNotEmpty())
+                <div class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+                    <h3 class="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+                        <x-heroicon-o-paper-clip class="h-4 w-4 text-gray-500" />
+                        Medias de la tache ({{ $this->taskMedia->count() }})
+                    </h3>
+
+                    {{-- Photos thumbnails --}}
+                    @php $taskPhotos = $this->taskMedia->where('collection', 'photos'); @endphp
+                    @if($taskPhotos->isNotEmpty())
+                        <div class="mb-3 grid grid-cols-3 gap-2">
+                            @foreach($taskPhotos as $photo)
+                                <a href="{{ $photo->url }}" target="_blank" class="group relative aspect-square overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800">
+                                    <img src="{{ $photo->url }}" alt="{{ $photo->file_name }}" class="h-full w-full object-cover transition group-hover:scale-105" />
+                                </a>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    {{-- Audio/Video items --}}
+                    @php $taskOtherMedia = $this->taskMedia->whereIn('collection', ['audio', 'video']); @endphp
+                    @if($taskOtherMedia->isNotEmpty())
+                        <div class="space-y-1.5">
+                            @foreach($taskOtherMedia as $media)
+                                <a href="{{ $media->url }}" target="_blank"
+                                   class="flex items-center gap-2 rounded-lg border border-gray-200 p-2 text-xs transition hover:bg-gray-50 dark:border-white/10 dark:hover:bg-white/5">
+                                    @if($media->collection === 'audio')
+                                        <x-heroicon-o-musical-note class="h-4 w-4 shrink-0 text-amber-500" />
+                                    @else
+                                        <x-heroicon-o-video-camera class="h-4 w-4 shrink-0 text-blue-500" />
+                                    @endif
+                                    <span class="min-w-0 flex-1 truncate text-gray-700 dark:text-gray-300">{{ $media->file_name }}</span>
+                                    <span class="shrink-0 text-gray-400">{{ $media->humanSize }}</span>
+                                </a>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+            @endif
+
             {{-- Complete Task --}}
             @if($task->status !== 'completed')
                 <button
@@ -324,4 +433,32 @@
             </a>
         </div>
     </div>
+
+    {{-- ITEM DETAILS MODAL --}}
+    @if($selectedItemId && $this->selectedItem)
+        <div
+            class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-16"
+            x-data
+            x-on:click.self="$wire.closeItemDetails()"
+            x-on:keydown.escape.window="$wire.closeItemDetails()"
+        >
+            <div class="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl dark:bg-gray-900" x-on:click.stop>
+                {{-- Modal Header --}}
+                <div class="mb-4 flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                        {{ $this->selectedItem->asset?->asset_code }} — {{ $this->selectedItem->asset?->name }}
+                    </h3>
+                    <button
+                        wire:click="closeItemDetails"
+                        class="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-white/10 dark:hover:text-gray-200"
+                        type="button"
+                    >
+                        <x-heroicon-o-x-mark class="h-5 w-5" />
+                    </button>
+                </div>
+
+                @include('filament.app.resources.inventory-session-resource.partials.item-notes-media', ['item' => $this->selectedItem])
+            </div>
+        </div>
+    @endif
 </x-filament-panels::page>

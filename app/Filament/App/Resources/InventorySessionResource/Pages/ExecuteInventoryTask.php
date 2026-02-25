@@ -6,6 +6,7 @@ use App\Enums\InventoryItemStatus;
 use App\Enums\InventorySessionStatus;
 use App\Filament\App\Resources\InventorySessionResource;
 use App\Models\Asset;
+use App\Models\InventoryItem;
 use App\Models\InventorySession;
 use App\Models\InventoryTask;
 use App\Services\InventoryScanService;
@@ -35,6 +36,8 @@ class ExecuteInventoryTask extends Page
     public ?array $lastScannedAsset = null;
 
     public string $activeTab = 'all';
+
+    public ?string $selectedItemId = null;
 
     public function mount(int|string $record, string $taskId): void
     {
@@ -199,10 +202,44 @@ class ExecuteInventoryTask extends Page
         ]));
     }
 
+    public function showItemDetails(string $itemId): void
+    {
+        $this->selectedItemId = $itemId;
+    }
+
+    public function closeItemDetails(): void
+    {
+        $this->selectedItemId = null;
+    }
+
+    #[Computed]
+    public function taskNotes()
+    {
+        return $this->task->notes()->with(['creator', 'sourceMedia'])->latest()->get();
+    }
+
+    #[Computed]
+    public function taskMedia()
+    {
+        return $this->task->media()->with('uploader')->latest()->get();
+    }
+
+    #[Computed]
+    public function selectedItem()
+    {
+        if (! $this->selectedItemId) {
+            return null;
+        }
+
+        return InventoryItem::withoutGlobalScopes()
+            ->with(['asset', 'condition', 'scanner', 'notes.creator', 'notes.sourceMedia', 'media.uploader'])
+            ->find($this->selectedItemId);
+    }
+
     #[Computed]
     public function items()
     {
-        $query = $this->scopedItemsQuery();
+        $query = $this->scopedItemsQuery()->withCount(['notes', 'media']);
 
         if ($this->activeTab !== 'all') {
             $query->where('status', $this->activeTab);
@@ -234,6 +271,6 @@ class ExecuteInventoryTask extends Page
 
     protected function refreshCounters(): void
     {
-        unset($this->items, $this->stats);
+        unset($this->items, $this->stats, $this->taskNotes, $this->taskMedia);
     }
 }

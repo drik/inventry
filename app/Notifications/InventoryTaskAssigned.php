@@ -2,7 +2,6 @@
 
 namespace App\Notifications;
 
-use App\Filament\App\Resources\InventorySessionResource;
 use App\Models\InventoryTask;
 use App\Models\NotificationTemplate;
 use Filament\Notifications\Actions\Action;
@@ -44,10 +43,10 @@ class InventoryTaskAssigned extends Notification
     {
         $rendered = $this->getRendered($notifiable);
 
-        $url = InventorySessionResource::getUrl('execute-task', [
+        $url = route('filament.app.resources.inventory-sessions.execute-task', [
+            'tenant' => $this->task->session->organization,
             'record' => $this->task->session_id,
             'taskId' => $this->task->id,
-            'tenant' => $this->task->session->organization,
         ]);
 
         return \Filament\Notifications\Notification::make()

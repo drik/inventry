@@ -14,6 +14,9 @@ use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\SyncController;
 use App\Http\Controllers\Api\TaskController;
+use App\Models\AssetCategory;
+use App\Models\Location;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // Public routes
@@ -51,6 +54,54 @@ Route::middleware('auth:sanctum')->group(function () {
     // Conditions
     Route::get('/conditions', [ConditionController::class, 'index']);
     Route::put('/tasks/{taskId}/items/{itemId}/condition', [ConditionController::class, 'updateItemCondition']);
+
+    // Reference data (categories, locations)
+    Route::get('/categories', function (Request $request) {
+        $org = $request->user()->organization;
+        $categories = AssetCategory::withoutGlobalScopes()
+            ->where('organization_id', $org->id)
+            ->orderBy('name')
+            ->get()
+            ->map(function ($cat) {
+                $path = $cat->name;
+                $parent = $cat->parent;
+                while ($parent) {
+                    $path = $parent->name . ' > ' . $path;
+                    $parent = $parent->parent;
+                }
+                return [
+                    'id' => $cat->id,
+                    'name' => $cat->name,
+                    'full_path' => $path,
+                ];
+            });
+
+        return response()->json(['data' => $categories]);
+    });
+
+    Route::get('/locations', function (Request $request) {
+        $org = $request->user()->organization;
+        $locations = Location::withoutGlobalScopes()
+            ->where('organization_id', $org->id)
+            ->orderBy('name')
+            ->get()
+            ->map(function ($loc) {
+                $path = $loc->name;
+                $parent = $loc->parent;
+                while ($parent) {
+                    $path = $parent->name . ' > ' . $path;
+                    $parent = $parent->parent;
+                }
+                return [
+                    'id' => $loc->id,
+                    'name' => $loc->name,
+                    'city' => $loc->city,
+                    'full_path' => $path,
+                ];
+            });
+
+        return response()->json(['data' => $locations]);
+    });
 
     // Item status
     Route::put('/tasks/{taskId}/items/{itemId}/status', [ItemStatusController::class, 'update']);

@@ -11,7 +11,9 @@ use App\Filament\App\Resources\AssetResource\RelationManagers;
 use App\Models\Asset;
 use App\Models\AssetCategory;
 use App\Models\AssetTag;
+use App\Models\AssetTagValue;
 use Filament\Facades\Filament;
+use Illuminate\Database\Eloquent\Model;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Infolists;
@@ -151,6 +153,34 @@ class AssetResource extends Resource
                                                     ->helperText(fn (Forms\Get $get): ?string => AssetTag::find($get('asset_tag_id'))?->description)
                                                     ->maxLength(255)
                                                     ->live(debounce: 500)
+                                                    ->rules([
+                                                        fn (Forms\Get $get, ?Model $record): \Closure => function (string $attribute, $value, \Closure $fail) use ($get, $record) {
+                                                            if (empty($value)) {
+                                                                return;
+                                                            }
+
+                                                            $tagId = $get('asset_tag_id');
+                                                            $tag = AssetTag::find($tagId);
+
+                                                            if (! $tag || ! $tag->is_unique) {
+                                                                return;
+                                                            }
+
+                                                            $orgId = Filament::getTenant()?->id;
+                                                            $query = AssetTagValue::where('organization_id', $orgId)
+                                                                ->where('asset_tag_id', $tagId)
+                                                                ->where('value', $value);
+
+                                                            // Exclude current asset when editing ($record is AssetTagValue here)
+                                                            if ($record instanceof AssetTagValue && $record->asset_id) {
+                                                                $query->where('asset_id', '!=', $record->asset_id);
+                                                            }
+
+                                                            if ($query->exists()) {
+                                                                $fail("La valeur \"{$value}\" existe déjà pour le tag \"{$tag->name}\". Les valeurs de ce tag doivent être uniques.");
+                                                            }
+                                                        },
+                                                    ])
                                                     ->suffixAction(
                                                         Forms\Components\Actions\Action::make('scan')
                                                             ->icon('heroicon-o-qr-code')

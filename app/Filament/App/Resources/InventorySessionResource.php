@@ -110,7 +110,11 @@ class InventorySessionResource extends Resource
                             ->schema([
                                 Forms\Components\Select::make('assigned_to')
                                     ->label('Assignee')
-                                    ->relationship('assignee', 'name')
+                                    ->relationship(
+                                        'assignee',
+                                        'name',
+                                        fn ($query) => $query->where('organization_id', Filament::getTenant()->id),
+                                    )
                                     ->required()
                                     ->searchable()
                                     ->preload(),

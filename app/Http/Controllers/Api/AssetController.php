@@ -14,6 +14,7 @@ use App\Services\PlanLimitService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class AssetController extends Controller
 {
@@ -112,6 +113,11 @@ class AssetController extends Controller
 
         $org = $request->user()->organization;
 
+        // Validate uniqueness of tag values before creating the asset
+        if ($request->has('tag_values')) {
+            $this->validateUniqueTagValues($request->input('tag_values'), $org->id);
+        }
+
         $asset = Asset::create([
             'organization_id' => $org->id,
             'name' => $request->input('name'),
@@ -184,6 +190,11 @@ class AssetController extends Controller
         $asset = Asset::withoutGlobalScopes()
             ->where('organization_id', $org->id)
             ->findOrFail($id);
+
+        // Validate uniqueness of tag values (excluding current asset)
+        if ($request->has('tag_values')) {
+            $this->validateUniqueTagValues($request->input('tag_values'), $org->id, $asset->id);
+        }
 
         $asset->update($request->only([
             'name', 'category_id', 'location_id', 'manufacturer_id',
@@ -344,6 +355,35 @@ class AssetController extends Controller
         $extraction = $result['extraction'];
         $resolvedIds = $result['resolved_ids'];
 
+        // Build tag values from AI extraction for validation
+        $aiTagValues = [];
+        if ($extraction->serialNumber || $extraction->sku) {
+            $systemTags = AssetTag::withoutGlobalScopes()
+                ->where('organization_id', $org->id)
+                ->where('is_system', true)
+                ->get()
+                ->keyBy('name');
+
+            if ($extraction->serialNumber && $systemTags->has('Serial Number')) {
+                $aiTagValues[] = [
+                    'asset_tag_id' => $systemTags->get('Serial Number')->id,
+                    'value' => $extraction->serialNumber,
+                ];
+            }
+
+            if ($extraction->sku && $systemTags->has('SKU')) {
+                $aiTagValues[] = [
+                    'asset_tag_id' => $systemTags->get('SKU')->id,
+                    'value' => $extraction->sku,
+                ];
+            }
+        }
+
+        // Validate uniqueness of AI-extracted tag values before creating the asset
+        if (! empty($aiTagValues)) {
+            $this->validateUniqueTagValues($aiTagValues, $org->id);
+        }
+
         // Create asset — user overrides take priority, then AI, then defaults
         $asset = Asset::create([
             'organization_id' => $org->id,
@@ -356,31 +396,14 @@ class AssetController extends Controller
             'notes' => $request->input('notes') ?? $extraction->suggestedDescription,
         ]);
 
-        // Create tag values for serial_number and sku if detected
-        if ($extraction->serialNumber || $extraction->sku) {
-            $systemTags = AssetTag::withoutGlobalScopes()
-                ->where('organization_id', $org->id)
-                ->where('is_system', true)
-                ->get()
-                ->keyBy('name');
-
-            if ($extraction->serialNumber && $systemTags->has('Serial Number')) {
-                AssetTagValue::create([
-                    'organization_id' => $org->id,
-                    'asset_id' => $asset->id,
-                    'asset_tag_id' => $systemTags->get('Serial Number')->id,
-                    'value' => $extraction->serialNumber,
-                ]);
-            }
-
-            if ($extraction->sku && $systemTags->has('SKU')) {
-                AssetTagValue::create([
-                    'organization_id' => $org->id,
-                    'asset_id' => $asset->id,
-                    'asset_tag_id' => $systemTags->get('SKU')->id,
-                    'value' => $extraction->sku,
-                ]);
-            }
+        // Create tag values for serial_number and sku
+        foreach ($aiTagValues as $tagValue) {
+            AssetTagValue::create([
+                'organization_id' => $org->id,
+                'asset_id' => $asset->id,
+                'asset_tag_id' => $tagValue['asset_tag_id'],
+                'value' => $tagValue['value'],
+            ]);
         }
 
         // Create images from captured photos (first = primary)
@@ -413,6 +436,66 @@ class AssetController extends Controller
             'recognition_log_id' => $result['recognition_log_id'],
             'usage' => $usage,
         ], 201);
+    }
+
+    /**
+     * Validate that tag values marked as unique don't have duplicates in the organization.
+     *
+     * @throws ValidationException
+     */
+    private function validateUniqueTagValues(array $tagValues, string $orgId, ?string $excludeAssetId = null): void
+    {
+        $errors = [];
+
+        // Get all unique tag IDs from the submitted values
+        $tagIds = collect($tagValues)
+            ->filter(fn ($tv) => ! empty($tv['value']))
+            ->pluck('asset_tag_id')
+            ->unique()
+            ->toArray();
+
+        if (empty($tagIds)) {
+            return;
+        }
+
+        // Fetch tags that are marked as unique
+        $uniqueTags = AssetTag::withoutGlobalScopes()
+            ->where('organization_id', $orgId)
+            ->whereIn('id', $tagIds)
+            ->where('is_unique', true)
+            ->get()
+            ->keyBy('id');
+
+        if ($uniqueTags->isEmpty()) {
+            return;
+        }
+
+        foreach ($tagValues as $index => $tagValue) {
+            if (empty($tagValue['value'])) {
+                continue;
+            }
+
+            $tag = $uniqueTags->get($tagValue['asset_tag_id']);
+            if (! $tag) {
+                continue;
+            }
+
+            $query = AssetTagValue::where('organization_id', $orgId)
+                ->where('asset_tag_id', $tag->id)
+                ->where('value', $tagValue['value']);
+
+            if ($excludeAssetId) {
+                $query->where('asset_id', '!=', $excludeAssetId);
+            }
+
+            if ($query->exists()) {
+                $errors["tag_values.{$index}.value"] = "La valeur \"{$tagValue['value']}\" existe déjà pour le tag \"{$tag->name}\". Les valeurs de ce tag doivent être uniques.";
+            }
+        }
+
+        if (! empty($errors)) {
+            throw ValidationException::withMessages($errors);
+        }
     }
 
     /**

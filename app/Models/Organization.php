@@ -50,6 +50,7 @@ class Organization extends Model implements HasCurrentTenantLabel
                 'encoding_mode' => EncodingMode::QrCode,
                 'sort_order' => 1,
                 'is_system' => true,
+                'is_unique' => true,
             ]);
 
             AssetTag::withoutGlobalScopes()->create([
@@ -61,6 +62,7 @@ class Organization extends Model implements HasCurrentTenantLabel
                 'encoding_mode' => EncodingMode::EAN13,
                 'sort_order' => 2,
                 'is_system' => true,
+                'is_unique' => true,
             ]);
 
             // Create storage usage tracking

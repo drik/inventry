@@ -23,6 +23,7 @@ class AssetTag extends Model
         'encoding_mode',
         'sort_order',
         'is_system',
+        'is_unique',
     ];
 
     protected function casts(): array
@@ -30,6 +31,7 @@ class AssetTag extends Model
         return [
             'is_required' => 'boolean',
             'is_system' => 'boolean',
+            'is_unique' => 'boolean',
             'encoding_mode' => EncodingMode::class,
         ];
     }

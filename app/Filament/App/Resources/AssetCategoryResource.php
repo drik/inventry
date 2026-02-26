@@ -79,6 +79,10 @@ class AssetCategoryResource extends Resource
                                 Forms\Components\Toggle::make('is_required')
                                     ->label('Required'),
 
+                                Forms\Components\Toggle::make('is_unique')
+                                    ->label('Unique')
+                                    ->helperText('Prevents duplicate values across assets'),
+
                                 Forms\Components\Select::make('encoding_mode')
                                     ->label('Encoding Mode')
                                     ->options(EncodingMode::class)

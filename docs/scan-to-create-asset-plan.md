@@ -2,11 +2,11 @@
 
 ## Contexte
 
-L'utilisateur veut permettre la création d'assets via l'IA, autant depuis le backoffice Filament que depuis l'API mobile. L'idée : prendre une photo d'un produit (boîte, étiquette...), l'IA analyse l'image et extrait les infos (nom, marque, modèle, numéro de série, SKU...) pour pré-remplir le formulaire de création d'asset.
+L'utilisateur veut permettre la création d'assets via l'IA, autant depuis le backoffice Filament que depuis l'API mobile. L'idée : prendre une ou **plusieurs photos** d'un produit (boîte, étiquette, numéro de série, différents angles...), l'IA analyse les images et combine les infos (nom, marque, modèle, numéro de série, SKU...) pour pré-remplir le formulaire de création d'asset.
 
 **Placement du bouton "Créer avec IA"** : sur la page Liste des Assets ET la page Create Asset.
-**Capture photo** : upload fichier ET caméra navigateur (MediaDevices API).
-**API Mobile** : CRUD complet sur les assets + création via AI.
+**Capture photo** : upload fichier (jusqu'à 5 images) via le FileUpload natif de Filament.
+**API Mobile** : CRUD complet sur les assets + création via AI (multi-image avec rétrocompatibilité single).
 **Contexte AI** : indépendant des sessions d'inventaire (pas de task_id requis).
 
 ---
@@ -43,26 +43,27 @@ readonly class AiAssetExtractionResult
 
 **Fichier à modifier** : `app/Services/AiVisionService.php`
 
-### 2A. Nouvelle méthode `extractAssetInfo()`
+### 2A. Nouvelle méthode `extractAssetInfo()` (multi-image)
 
 ```php
 public function extractAssetInfo(
-    string $imagePath,
+    array $imagePaths,            // ['path1', 'path2', ...] — jusqu'à 5 images
     Organization $organization,
-    ?string $storagePath = null,
+    ?array $storagePaths = null,   // correspondance 1:1 avec imagePaths
 ): array
 ```
 
 Flux :
-1. `prepareImage()` existant (resize 512px, JPEG 85%, base64)
-2. Charger les catégories et fabricants de l'org comme contexte
-3. Construire le prompt d'extraction (nouveau)
-4. Sélectionner le provider via `getProvider()` existant
-5. Appeler provider avec try/catch + fallback (même pattern que `analyzePhoto()`)
-6. Parser la réponse en `AiAssetExtractionResult::fromAiResponse()`
-7. Résoudre les noms suggérés en IDs via `resolveExtractionToIds()` (nouveau)
-8. Logger via `logRecognition()` existant avec `use_case = 'asset_extraction'`, `task_id = null`
-9. Retourner `['recognition_log_id', 'extraction' => DTO, 'resolved_ids' => [...], 'image_path']`
+1. Boucler sur `$imagePaths`, appeler `prepareImage()` pour chacune (resize 512px, JPEG 85%, base64)
+2. Construire `$images = ['photo_1' => base64, 'photo_2' => base64, ...]` (ou `'captured'` si une seule image)
+3. Charger les catégories et fabricants de l'org comme contexte
+4. Construire le prompt d'extraction avec `buildExtractionPrompt($categories, $manufacturers, $imageCount)`
+5. Sélectionner le provider via `getProvider()` existant
+6. Appeler `$provider->analyze($images, ...)` avec try/catch + fallback (les providers supportent déjà les images multiples)
+7. Parser la réponse en `AiAssetExtractionResult::fromAiResponse()`
+8. Résoudre les noms suggérés en IDs via `resolveExtractionToIds()` (nouveau)
+9. Logger via `logRecognition()` existant avec `use_case = 'asset_extraction'`, `task_id = null`
+10. Retourner `['recognition_log_id', 'extraction' => DTO, 'resolved_ids' => [...], 'image_paths' => array]`
 
 ### 2B. Nouveau prompt d'extraction
 
@@ -74,12 +75,16 @@ Réponds UNIQUEMENT en JSON valide.
 Les scores de confiance vont de 0.0 à 1.0.
 ```
 
-Méthode `buildExtractionPrompt($categories, $manufacturers)` :
+Méthode `buildExtractionPrompt($categories, $manufacturers, $imageCount)` :
 ```
+[Si $imageCount > 1:]
+Plusieurs photos du même objet sont fournies (différents angles, étiquettes, détails).
+Combine les informations de toutes les photos pour une extraction la plus complète possible.
+
 Les catégories d'actifs sont : {liste}
 Les fabricants connus sont : {liste}
 
-Analyse la photo et retourne un JSON avec :
+Analyse la/les photo(s) et retourne un JSON avec :
 - "suggested_name" : nom descriptif
 - "suggested_category" : parmi les catégories listées ou suggestion libre
 - "suggested_brand" : parmi les fabricants connus ou nom détecté
@@ -118,58 +123,42 @@ Décode le base64, stocke dans `ai-captures/{org_id}/{date}/`, retourne le stora
 
 ## Phase 3 : Filament — Bouton "Créer avec IA"
 
-### 3A. Page ListAssets — Header Action
+### 3A. Page ListAssets — Header Action (multi-image)
 
 **Fichier** : `app/Filament/App/Resources/AssetResource/Pages/ListAssets.php`
 
-Ajouter un header action "Créer avec IA" :
+Header action "Créer avec IA" utilisant le système modal natif de Filament :
 - Icône `heroicon-o-sparkles`, couleur `info`
-- Visible si `config('ai-vision.enabled')` et quota non dépassé
-- Ouvre un modal contenant le composant `ai-photo-capture`
-- Au submit (via Livewire), appelle `analyzePhotoForAsset(base64)`
-- Stocke le résultat en session, redirige vers CreateAsset
+- Visible si `config('ai-vision.enabled')`
+- Modal avec `FileUpload::make('photos')->multiple()->maxFiles(5)`
+- Description modale : "Sélectionnez une ou plusieurs photos du produit (différents angles, étiquettes...)"
+- L'action construit les chemins absolus depuis les storage paths
+- Appelle `extractAssetInfo(imagePaths: $absolutePaths, storagePaths: $storagePaths)`
+- Stocke le résultat en session avec `'image_paths'` (array), redirige vers CreateAsset
 
-Méthode Livewire sur ListAssets :
-```php
-public function analyzePhotoForAsset(string $base64Image): void
-{
-    // Décoder, stocker, appeler AiVisionService::extractAssetInfo()
-    // session()->put('ai_asset_extraction', $result)
-    // redirect vers CreateAsset
-}
-```
-
-### 3B. Page CreateAsset — Pré-remplissage + AI inline
+### 3B. Page CreateAsset — Pré-remplissage + AI inline (multi-image)
 
 **Fichier** : `app/Filament/App/Resources/AssetResource/Pages/CreateAsset.php`
 
 Modifications :
-1. **Header action** "Remplir avec l'IA" — même modal caméra/upload, mais au lieu de rediriger, remplit directement le form via `$this->form->fill()`
+1. **Header action** "Remplir avec l'IA" — modal natif Filament avec `FileUpload::make('photos')->multiple()->maxFiles(5)`, remplit directement le form via `$this->form->fill()`
 2. **Mount** — Vérifie si des données AI en session (`ai_asset_extraction`), si oui pré-remplit le formulaire
-3. **`fillFormFromAiData()`** — Mappe les résultats AI vers les champs du formulaire (name, category_id, manufacturer_id, notes, tagValues)
-4. **`afterCreate()`** — Si photo AI utilisée, crée un `AssetImage` primaire + met à jour l'`AiRecognitionLog` avec `selected_asset_id`
+3. **`fillFormFromAiData()`** — Mappe les résultats AI vers les champs du formulaire (name, category_id, manufacturer_id, notes, tagValues). Stocke `$this->aiImagePaths` (array) avec rétrocompatibilité `image_path` → `[image_path]`
+4. **`afterCreate()`** — Boucle sur `$this->aiImagePaths` pour créer un `AssetImage` par photo (première = `is_primary`, `sort_order` = index) + met à jour l'`AiRecognitionLog` avec `selected_asset_id`
+
+**Note** : utilise `$this->data ?? []` au lieu de `$this->form->getState()` pour éviter la validation des champs required sur un formulaire vide.
 
 Propriétés ajoutées :
 ```php
 public ?string $aiRecognitionLogId = null;
-public ?string $aiImagePath = null;
+public ?array $aiImagePaths = null;
 ```
 
-### 3C. Composant Blade — ai-photo-capture
+### 3C. ~~Composant Blade — ai-photo-capture~~ (Abandonné)
 
-**Nouveau fichier** : `resources/views/filament/forms/components/ai-photo-capture.blade.php`
+Le composant Alpine.js custom (`ai-photo-capture.blade.php`) a été **remplacé par le système modal natif de Filament** (`->form([FileUpload])` + `->action()`). L'approche custom posait des conflits avec les handlers `wire:click`/`x-on:click` internes de Filament Actions.
 
-Composant Alpine.js avec :
-
-1. **Sélecteur de mode** : onglets "Upload" / "Caméra"
-2. **Mode Upload** : zone drag-and-drop + input file (accept="image/*")
-3. **Mode Caméra** : `navigator.mediaDevices.getUserMedia()` avec vidéo live + bouton capturer
-4. **Aperçu** : affiche l'image capturée/uploadée avec bouton "Reprendre"
-5. **Bouton "Analyser avec l'IA"** : envoie le base64 via `$wire.call('analyzePhotoForAsset', base64)`
-6. **État loading** : spinner pendant l'analyse
-7. **Gestion d'erreurs** : messages pour caméra refusée, quota dépassé, etc.
-
-Pattern Alpine.js similaire à `tag-scanner-modal.blade.php` (utilise `$wire` pour communiquer avec Livewire).
+Le fichier `resources/views/filament/forms/components/ai-photo-capture.blade.php` existe encore mais n'est plus utilisé.
 
 ---
 
@@ -216,17 +205,21 @@ Pattern Alpine.js similaire à `tag-scanner-modal.blade.php` (utilise `$wire` po
 #### `DELETE /api/assets/{id}` — Suppression
 - Soft delete via `$asset->delete()`
 
-#### `POST /api/assets/ai-extract` — Extraction AI sans création
-- Validation: photo (required, image, max 2048KB)
+#### `POST /api/assets/ai-extract` — Extraction AI sans création (multi-image)
+- Validation avec rétrocompatibilité :
+  - `photos` : `required_without:photo|array|min:1|max:5` + `photos.*` : `image|mimes:jpeg,jpg,png|max:{maxSize}`
+  - `photo` : `required_without:photos|image|mimes:jpeg,jpg,png|max:{maxSize}`
+- Résolution : `$files = $request->file('photos') ?? [$request->file('photo')]`
 - Vérifie quotas AI (daily + monthly)
-- Stocke la photo via `storeCapturedPhoto()`
-- Appelle `AiVisionService::extractAssetInfo()`
-- Retourne: `recognition_log_id`, `extraction` (DTO), `resolved_ids`, `image_path`, `usage`
+- Boucle `storeCapturedPhoto()` pour chaque fichier
+- Appelle `AiVisionService::extractAssetInfo(imagePaths: [...], storagePaths: [...])`
+- Retourne: `recognition_log_id`, `extraction` (DTO), `resolved_ids`, `image_paths` (array), `usage`
 
-#### `POST /api/assets/ai-create` — Extraction AI + Création
-- Validation: photo (required) + location_id (required, AI ne peut pas le deviner) + overrides optionnels
-- Appelle `extractAssetInfo()` puis crée l'asset
-- Crée `AssetImage` primaire avec la photo capturée
+#### `POST /api/assets/ai-create` — Extraction AI + Création (multi-image)
+- Même validation multi-image avec rétrocompatibilité `photo`/`photos`
+- `location_id` (required, AI ne peut pas le deviner) + overrides optionnels
+- Boucle `storeCapturedPhoto()` puis appelle `extractAssetInfo()`
+- Crée l'asset, puis boucle pour créer un `AssetImage` par photo (première = `is_primary`, `sort_order` = index)
 - Met à jour `AiRecognitionLog` avec `selected_asset_id` et `selected_action = 'created'`
 - Retourne: asset complet + extraction data
 
@@ -260,12 +253,13 @@ Méthodes privées `formatAsset()` et `formatAssetDetailed()` dans le contrôleu
 | Fichier | Action | Description |
 |---------|--------|-------------|
 | `app/DTOs/AiAssetExtractionResult.php` | **Créer** | DTO pour les résultats d'extraction AI |
-| `app/Services/AiVisionService.php` | **Modifier** | +`extractAssetInfo()`, +prompts extraction, +`resolveExtractionToIds()`, +`storeBase64Photo()` |
-| `app/Http/Controllers/Api/AssetController.php` | **Créer** | CRUD complet + endpoints AI |
+| `app/Services/AiVisionService.php` | **Modifier** | +`extractAssetInfo(array $imagePaths)`, +prompts extraction (multi-image), +`resolveExtractionToIds()`, +`storeBase64Photo()` |
+| `app/Http/Controllers/Api/AssetController.php` | **Créer** | CRUD complet + endpoints AI multi-image avec rétrocompat `photo`/`photos` |
 | `routes/api.php` | **Modifier** | +7 routes assets |
-| `resources/views/filament/forms/components/ai-photo-capture.blade.php` | **Créer** | Composant Alpine caméra + upload |
-| `app/Filament/App/Resources/AssetResource/Pages/ListAssets.php` | **Modifier** | +header action "Créer avec IA" + méthode Livewire |
-| `app/Filament/App/Resources/AssetResource/Pages/CreateAsset.php` | **Modifier** | +header action inline, +session hydration, +afterCreate hook |
+| `config/gemini.php` | **Modifier** | Timeout augmenté à 120s (nécessaire pour multi-image) |
+| ~~`resources/views/filament/forms/components/ai-photo-capture.blade.php`~~ | ~~Créer~~ | ~~Abandonné~~ — remplacé par le FileUpload natif de Filament |
+| `app/Filament/App/Resources/AssetResource/Pages/ListAssets.php` | **Modifier** | +header action "Créer avec IA" multi-image (FileUpload natif) |
+| `app/Filament/App/Resources/AssetResource/Pages/CreateAsset.php` | **Modifier** | +header action multi-image, +session hydration, +afterCreate boucle images |
 
 ## Patterns réutilisés
 
@@ -280,13 +274,14 @@ Méthodes privées `formatAsset()` et `formatAssetDetailed()` dans le contrôleu
 
 ## Vérification
 
-1. **Filament Liste** → Cliquer "Créer avec IA" → uploader une photo → vérifier que l'AI extrait les infos → vérifier la redirection vers CreateAsset avec le formulaire pré-rempli
-2. **Filament Create** → Cliquer "Remplir avec l'IA" → prendre une photo caméra → vérifier que les champs se remplissent
-3. **Filament Create** → Vérifier que la photo AI est enregistrée comme image primaire après la création
-4. **API** → `POST /api/assets/ai-extract` avec une photo → vérifier la réponse JSON (extraction + resolved_ids)
-5. **API** → `POST /api/assets/ai-create` avec photo + location_id → vérifier que l'asset est créé avec les bonnes données
-6. **API** → `GET /api/assets` → vérifier la liste paginée avec filtres
-7. **API** → `PUT /api/assets/{id}` → vérifier la mise à jour
-8. **API** → `DELETE /api/assets/{id}` → vérifier le soft delete
-9. **Quotas** → Vérifier que les limites plan sont respectées (daily, monthly, max_assets)
-10. **Caméra** → Tester sur mobile (facingMode: environment) et desktop (facingMode: user fallback)
+1. **Filament Liste** → Cliquer "Créer avec IA" → uploader 1 à 5 photos → vérifier que l'AI extrait et combine les infos → vérifier la redirection vers CreateAsset avec le formulaire pré-rempli
+2. **Filament Create** → Cliquer "Remplir avec l'IA" → uploader plusieurs photos → vérifier que les champs se remplissent
+3. **Filament Create** → Vérifier que toutes les photos AI sont enregistrées comme AssetImage après la création (première = primary)
+4. **API** → `POST /api/assets/ai-extract` avec `photos[]` (multipart) → vérifier la réponse JSON (extraction + resolved_ids + image_paths array)
+5. **API** → `POST /api/assets/ai-create` avec `photos[]` + location_id → vérifier que l'asset est créé avec les bonnes données + images
+6. **API rétrocompat** → `POST /api/assets/ai-extract` avec `photo` (singulier) → doit toujours fonctionner
+7. **API** → `GET /api/assets` → vérifier la liste paginée avec filtres
+8. **API** → `PUT /api/assets/{id}` → vérifier la mise à jour
+9. **API** → `DELETE /api/assets/{id}` → vérifier le soft delete
+10. **Quotas** → Vérifier que les limites plan sont respectées (daily, monthly, max_assets)
+11. **Limite images** → Tenter 6 photos → vérifier erreur validation max:5

@@ -576,6 +576,225 @@ Supprimer une note.
 
 ---
 
+## Assets
+
+CRUD complet sur les assets + création assistée par IA (multi-image).
+
+### `GET /api/assets`
+
+Liste paginée des assets de l'organisation.
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `search` | string | Recherche sur nom, asset_code, tag values |
+| `category_id` | string | Filtre par catégorie |
+| `location_id` | string | Filtre par emplacement |
+| `status` | string | Filtre par statut |
+| `page` | int | Page (20 résultats/page) |
+
+```bash
+curl "http://localhost:8000/api/assets?search=MacBook&category_id=01HX..." \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json"
+```
+
+**Réponse 200 :**
+```json
+{
+  "data": [
+    {
+      "id": "01HX...",
+      "asset_code": "AST-00001",
+      "name": "MacBook Pro 14\"",
+      "category_name": "Ordinateurs portables",
+      "location_name": "Siège - Lomé",
+      "manufacturer_name": "Apple",
+      "model_name": "MacBook Pro 14-inch",
+      "status": "available",
+      "primary_image_url": "http://localhost:8000/storage/...",
+      "tag_values": [
+        { "tag_name": "Serial Number", "value": "FVFXJ3K1Q6LR" }
+      ],
+      "created_at": "2026-02-20T10:00:00+00:00"
+    }
+  ],
+  "meta": { "current_page": 1, "last_page": 1, "total": 5 }
+}
+```
+
+### `GET /api/assets/{id}`
+
+Détail complet d'un asset avec toutes ses relations.
+
+```bash
+curl http://localhost:8000/api/assets/{id} \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json"
+```
+
+### `POST /api/assets`
+
+Création manuelle d'un asset. **Middleware** : `plan.limit:max_assets`
+
+```bash
+curl -X POST http://localhost:8000/api/assets \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json" \
+  -d '{
+    "name": "MacBook Pro 14\"",
+    "category_id": "01HX...",
+    "location_id": "01HX...",
+    "manufacturer_id": "01HX...",
+    "model_id": "01HX...",
+    "status": "available",
+    "notes": "Neuf, sous garantie",
+    "tag_values": [
+      { "asset_tag_id": "01HX...", "value": "FVFXJ3K1Q6LR" }
+    ]
+  }'
+```
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `name` | string | **Requis.** Nom de l'asset |
+| `category_id` | string | **Requis.** ID catégorie |
+| `location_id` | string | **Requis.** ID emplacement |
+| `manufacturer_id` | string | Optionnel. ID fabricant |
+| `model_id` | string | Optionnel. ID modèle |
+| `status` | string | Optionnel. Défaut : `available` |
+| `purchase_date` | date | Optionnel. Date d'achat |
+| `purchase_cost` | numeric | Optionnel. Coût d'achat |
+| `notes` | string | Optionnel. Notes |
+| `tag_values` | array | Optionnel. Valeurs de tags |
+| `image` | file | Optionnel. Image principale |
+
+**Réponse 201 :** Asset créé avec ses relations.
+
+### `PUT /api/assets/{id}`
+
+Mise à jour d'un asset. Mêmes champs que la création mais tous optionnels.
+
+```bash
+curl -X PUT http://localhost:8000/api/assets/{id} \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json" \
+  -d '{"name": "MacBook Pro 14\" - Marie", "status": "in_use"}'
+```
+
+### `DELETE /api/assets/{id}`
+
+Suppression douce d'un asset.
+
+```bash
+curl -X DELETE http://localhost:8000/api/assets/{id} \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json"
+```
+
+### `POST /api/assets/ai-extract`
+
+Extraction d'informations produit par IA à partir d'une ou plusieurs photos (sans créer l'asset).
+
+**Middlewares** : `throttle:ai-vision`, `plan.limit:max_ai_requests_daily`
+
+Supporte `photos` (array, multi-image) et `photo` (singulier, rétrocompatibilité).
+
+```bash
+# Multi-image (recommandé)
+curl -X POST http://localhost:8000/api/assets/ai-extract \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json" \
+  -F "photos[]=@/path/to/front.jpg" \
+  -F "photos[]=@/path/to/label.jpg" \
+  -F "photos[]=@/path/to/serial.jpg"
+
+# Single image (rétrocompat)
+curl -X POST http://localhost:8000/api/assets/ai-extract \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json" \
+  -F "photo=@/path/to/photo.jpg"
+```
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `photos` | file[] | **Requis** (sauf si `photo`). 1 à 5 images JPEG/PNG, max 2048 Ko chacune |
+| `photo` | file | **Requis** (sauf si `photos`). Image unique (rétrocompatibilité) |
+
+**Réponse 200 :**
+```json
+{
+  "recognition_log_id": "01HX...",
+  "extraction": {
+    "suggested_name": "iPhone 15 Pro",
+    "suggested_category": "Téléphones",
+    "suggested_brand": "Apple",
+    "suggested_model": "iPhone 15 Pro",
+    "description": "Smartphone Apple dans sa boîte d'origine",
+    "serial_number": "F4GH7K9L2M",
+    "sku": null,
+    "detected_text": ["iPhone 15 Pro", "F4GH7K9L2M", "Apple"],
+    "confidence": 0.95
+  },
+  "resolved_ids": {
+    "category_id": "01HX...",
+    "manufacturer_id": "01HX...",
+    "model_id": "01HX...",
+    "unmatched_suggestions": {}
+  },
+  "image_paths": [
+    "ai-captures/01HX.../2026-02-25/abc123.jpg",
+    "ai-captures/01HX.../2026-02-25/def456.jpg",
+    "ai-captures/01HX.../2026-02-25/ghi789.jpg"
+  ],
+  "usage": {
+    "daily_used": 5,
+    "daily_limit": 30,
+    "monthly_used": 42,
+    "monthly_limit": 500
+  }
+}
+```
+
+**Erreur 403 :** Quota mensuel atteint.
+
+**Erreur 422 :** Plus de 5 photos ou format invalide.
+
+**Erreur 503 :** AI Vision désactivée.
+
+### `POST /api/assets/ai-create`
+
+Extraction IA + création automatique de l'asset. Combine les infos de toutes les photos.
+
+**Middlewares** : `throttle:ai-vision`, `plan.limit:max_ai_requests_daily`, `plan.limit:max_assets`
+
+```bash
+curl -X POST http://localhost:8000/api/assets/ai-create \
+  -H "Authorization: Bearer {token}" \
+  -H "Accept: application/json" \
+  -F "photos[]=@/path/to/front.jpg" \
+  -F "photos[]=@/path/to/label.jpg" \
+  -F "location_id=01HX..."
+```
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `photos` | file[] | **Requis** (sauf si `photo`). 1 à 5 images JPEG/PNG |
+| `photo` | file | **Requis** (sauf si `photos`). Image unique (rétrocompat) |
+| `location_id` | string | **Requis.** Emplacement (l'IA ne peut pas le deviner) |
+| `name` | string | Optionnel. Override du nom suggéré par l'IA |
+| `category_id` | string | Optionnel. Override de la catégorie |
+| `manufacturer_id` | string | Optionnel. Override du fabricant |
+| `model_id` | string | Optionnel. Override du modèle |
+| `notes` | string | Optionnel. Override des notes |
+
+**Réponse 201 :** Asset créé + données d'extraction + images associées (première = primary).
+
+**Erreurs :** Mêmes que `ai-extract` (403, 422, 503).
+
+---
+
 ## Documents (sur Assets)
 
 Gestion de documents (PDF, Excel, images) attachés aux assets.

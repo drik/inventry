@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AiAssistantController;
 use App\Http\Controllers\Api\AiVisionController;
+use App\Http\Controllers\Api\AssetController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ConditionController;
 use App\Http\Controllers\Api\DashboardController;
@@ -78,6 +79,17 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware(['throttle:ai-vision', 'plan.limit:max_ai_requests_daily']);
     Route::post('/tasks/{taskId}/ai-describe-video', [AiAssistantController::class, 'describeVideo'])
         ->middleware(['throttle:ai-vision', 'plan.limit:max_ai_requests_daily']);
+
+    // Assets CRUD + AI
+    Route::get('/assets', [AssetController::class, 'index']);
+    Route::post('/assets', [AssetController::class, 'store'])->middleware('plan.limit:max_assets');
+    Route::post('/assets/ai-extract', [AssetController::class, 'aiExtract'])
+        ->middleware(['throttle:ai-vision', 'plan.limit:max_ai_requests_daily']);
+    Route::post('/assets/ai-create', [AssetController::class, 'aiCreate'])
+        ->middleware(['throttle:ai-vision', 'plan.limit:max_ai_requests_daily', 'plan.limit:max_assets']);
+    Route::get('/assets/{id}', [AssetController::class, 'show']);
+    Route::put('/assets/{id}', [AssetController::class, 'update']);
+    Route::delete('/assets/{id}', [AssetController::class, 'destroy']);
 
     // Documents (on assets)
     Route::post('/assets/{assetId}/documents', [DocumentController::class, 'upload']);

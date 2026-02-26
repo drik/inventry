@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\DTOs\AiAssetExtractionResult;
 use App\DTOs\AiIdentificationResult;
 use App\DTOs\AiMatchResult;
 use App\DTOs\AiVerificationResult;
@@ -10,7 +11,9 @@ use App\Models\AiRecognitionLog;
 use App\Models\AiUsageLog;
 use App\Models\Asset;
 use App\Models\AssetCategory;
+use App\Models\AssetModel;
 use App\Models\InventoryItem;
+use App\Models\Manufacturer;
 use App\Models\Organization;
 use App\Services\AiVision\VisionProviderInterface;
 use Illuminate\Support\Facades\Storage;
@@ -639,5 +642,258 @@ PROMPT;
         $directory = "ai-captures/{$org->id}/{$date}";
 
         return $uploadedFile->store($directory, 'public');
+    }
+
+    /**
+     * Store a base64-encoded photo and return its storage path.
+     */
+    public function storeBase64Photo(Organization $org, string $base64Data): string
+    {
+        // Strip data URI prefix if present
+        if (str_contains($base64Data, ',')) {
+            $base64Data = explode(',', $base64Data, 2)[1];
+        }
+
+        $decoded = base64_decode($base64Data);
+        $date = now()->format('Y-m-d');
+        $filename = uniqid('ai_') . '.jpg';
+        $path = "ai-captures/{$org->id}/{$date}/{$filename}";
+
+        Storage::disk('public')->put($path, $decoded);
+
+        return $path;
+    }
+
+    /**
+     * Extract asset information from one or more photos using AI.
+     * Independent of inventory sessions (no task_id required).
+     *
+     * @param  array  $imagePaths  Absolute paths to the images
+     * @param  array|null  $storagePaths  Corresponding storage-relative paths (1:1 with $imagePaths)
+     */
+    public function extractAssetInfo(
+        array $imagePaths,
+        Organization $organization,
+        ?array $storagePaths = null,
+    ): array {
+        $startTime = microtime(true);
+        $usedFallback = false;
+
+        // Prepare all images
+        $images = [];
+        foreach ($imagePaths as $index => $path) {
+            $prepared = $this->prepareImage($path);
+            $label = count($imagePaths) === 1 ? 'captured' : 'photo_' . ($index + 1);
+            $images[$label] = $prepared['base64'];
+        }
+
+        // Load org context for the prompt
+        $categories = AssetCategory::withoutGlobalScopes()
+            ->where('organization_id', $organization->id)
+            ->pluck('name')
+            ->toArray();
+
+        $manufacturers = Manufacturer::withoutGlobalScopes()
+            ->where(function ($q) use ($organization) {
+                $q->whereNull('organization_id')
+                    ->orWhere('organization_id', $organization->id);
+            })
+            ->pluck('name')
+            ->toArray();
+
+        // Build prompts
+        $systemPrompt = $this->getAssetExtractionSystemPrompt();
+        $prompt = $this->buildExtractionPrompt($categories, $manufacturers, count($imagePaths));
+
+        // Select provider
+        $provider = $this->getProvider($organization);
+
+        try {
+            $apiResult = $provider->analyze($images, $prompt, ['system' => $systemPrompt]);
+        } catch (\Exception $e) {
+            $plan = $this->planLimitService->getEffectivePlan($organization);
+            if ($plan->slug === 'freemium') {
+                throw $e;
+            }
+            $provider = $this->getFallbackProvider($organization);
+            $apiResult = $provider->analyze($images, $prompt, ['system' => $systemPrompt]);
+            $usedFallback = true;
+        }
+
+        $response = $apiResult['response'];
+        $latencyMs = (int) ((microtime(true) - $startTime) * 1000);
+
+        // Parse extraction result
+        $extraction = AiAssetExtractionResult::fromAiResponse($response);
+
+        // Resolve suggested names to IDs
+        $resolvedIds = $this->resolveExtractionToIds($extraction, $organization);
+
+        // Estimate cost
+        $estimatedCost = $this->estimateCost(
+            $provider->getProviderName(),
+            $apiResult['prompt_tokens'] ?? 0,
+            $apiResult['completion_tokens'] ?? 0,
+        );
+
+        // Log recognition (store first image path for the log)
+        $logImagePath = $storagePaths[0] ?? $imagePaths[0];
+        $log = $this->logRecognition(
+            organization: $organization,
+            taskId: null,
+            imagePath: $logImagePath,
+            annotatedImagePath: null,
+            useCase: 'asset_extraction',
+            systemPrompt: $systemPrompt,
+            userPrompt: $prompt,
+            provider: $provider,
+            usedFallback: $usedFallback,
+            response: $response,
+            matchedAssetIds: null,
+            promptTokens: $apiResult['prompt_tokens'] ?? 0,
+            completionTokens: $apiResult['completion_tokens'] ?? 0,
+            estimatedCost: $estimatedCost,
+            latencyMs: $latencyMs,
+        );
+
+        return [
+            'recognition_log_id' => $log->id,
+            'extraction' => $extraction,
+            'resolved_ids' => $resolvedIds,
+            'image_paths' => $storagePaths ?? $imagePaths,
+        ];
+    }
+
+    /**
+     * System prompt for asset extraction.
+     */
+    protected function getAssetExtractionSystemPrompt(): string
+    {
+        return <<<'PROMPT'
+Tu es un assistant spécialisé dans l'identification de produits et d'actifs physiques.
+Tu analyses des photos d'objets (boîtes, étiquettes, produits) pour en extraire les informations produit.
+Réponds UNIQUEMENT en JSON valide, sans balises markdown.
+Les scores de confiance vont de 0.0 (aucune confiance) à 1.0 (certitude absolue).
+PROMPT;
+    }
+
+    /**
+     * Build the extraction prompt with org context.
+     */
+    protected function buildExtractionPrompt(array $categories, array $manufacturers, int $imageCount = 1): string
+    {
+        $categoryList = count($categories) > 0
+            ? implode(', ', $categories)
+            : 'Aucune catégorie définie';
+
+        $manufacturerList = count($manufacturers) > 0
+            ? implode(', ', $manufacturers)
+            : 'Aucun fabricant défini';
+
+        $imageContext = $imageCount > 1
+            ? "Plusieurs photos du même objet sont fournies (différents angles ou détails).\nCombine les informations de toutes les photos pour une extraction la plus complète possible.\n\n"
+            : '';
+
+        return <<<PROMPT
+Les catégories d'actifs sont : {$categoryList}
+Les fabricants connus sont : {$manufacturerList}
+
+{$imageContext}Analyse les photos et retourne un JSON avec :
+- "suggested_name" : nom descriptif du produit/objet
+- "suggested_category" : parmi les catégories listées ou suggestion libre si aucune ne correspond
+- "suggested_brand" : parmi les fabricants connus ou nom de marque détecté sur le produit
+- "suggested_model" : modèle si visible sur le produit
+- "serial_number" : numéro de série si visible
+- "sku" : code SKU/référence produit si visible
+- "detected_text" : tableau de tous les textes détectés sur le produit
+- "description" : description courte de l'objet pour le champ notes
+- "confidence" : score de confiance global
+PROMPT;
+    }
+
+    /**
+     * Resolve AI-suggested names to database IDs.
+     */
+    protected function resolveExtractionToIds(AiAssetExtractionResult $extraction, Organization $org): array
+    {
+        $result = [
+            'category_id' => null,
+            'manufacturer_id' => null,
+            'model_id' => null,
+            'unmatched_suggestions' => [],
+        ];
+
+        // Resolve category
+        if ($extraction->suggestedCategory) {
+            $category = AssetCategory::withoutGlobalScopes()
+                ->where('organization_id', $org->id)
+                ->where('name', $extraction->suggestedCategory)
+                ->first();
+
+            if (! $category) {
+                $category = AssetCategory::withoutGlobalScopes()
+                    ->where('organization_id', $org->id)
+                    ->where('name', 'LIKE', '%' . $extraction->suggestedCategory . '%')
+                    ->first();
+            }
+
+            if ($category) {
+                $result['category_id'] = $category->id;
+            } else {
+                $result['unmatched_suggestions']['category'] = $extraction->suggestedCategory;
+            }
+        }
+
+        // Resolve manufacturer (org-specific + globals)
+        if ($extraction->suggestedBrand) {
+            $manufacturer = Manufacturer::withoutGlobalScopes()
+                ->where(function ($q) use ($org) {
+                    $q->whereNull('organization_id')
+                        ->orWhere('organization_id', $org->id);
+                })
+                ->where('name', $extraction->suggestedBrand)
+                ->first();
+
+            if (! $manufacturer) {
+                $manufacturer = Manufacturer::withoutGlobalScopes()
+                    ->where(function ($q) use ($org) {
+                        $q->whereNull('organization_id')
+                            ->orWhere('organization_id', $org->id);
+                    })
+                    ->where('name', 'LIKE', '%' . $extraction->suggestedBrand . '%')
+                    ->first();
+            }
+
+            if ($manufacturer) {
+                $result['manufacturer_id'] = $manufacturer->id;
+            } else {
+                $result['unmatched_suggestions']['manufacturer'] = $extraction->suggestedBrand;
+            }
+        }
+
+        // Resolve model (scoped to matched manufacturer)
+        if ($extraction->suggestedModel && $result['manufacturer_id']) {
+            $model = AssetModel::withoutGlobalScopes()
+                ->where('organization_id', $org->id)
+                ->where('manufacturer_id', $result['manufacturer_id'])
+                ->where('name', $extraction->suggestedModel)
+                ->first();
+
+            if (! $model) {
+                $model = AssetModel::withoutGlobalScopes()
+                    ->where('organization_id', $org->id)
+                    ->where('manufacturer_id', $result['manufacturer_id'])
+                    ->where('name', 'LIKE', '%' . $extraction->suggestedModel . '%')
+                    ->first();
+            }
+
+            if ($model) {
+                $result['model_id'] = $model->id;
+            } else {
+                $result['unmatched_suggestions']['model'] = $extraction->suggestedModel;
+            }
+        }
+
+        return $result;
     }
 }

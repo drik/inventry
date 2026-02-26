@@ -1207,6 +1207,330 @@
       "description": "Assistant IA pour les notes d'inventaire.\n\n4 modes : reformulation, description photo, transcription audio, description vidéo.\n\nProviders : Gemini 2.5 Flash (Freemium/Basic/Pro), GPT-4o/Whisper (Premium)."
     },
     {
+      "name": "Assets",
+      "item": [
+        {
+          "name": "List Assets",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Assets list returned', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('data');",
+                  "    pm.expect(jsonData).to.have.property('meta');",
+                  "    if (jsonData.data.length > 0) {",
+                  "        pm.collectionVariables.set('asset_id', jsonData.data[0].id);",
+                  "        console.log('First asset_id saved:', jsonData.data[0].id);",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/assets",
+              "host": ["{{base_url}}"],
+              "path": ["assets"],
+              "query": [
+                { "key": "search", "value": "", "disabled": true },
+                { "key": "category_id", "value": "", "disabled": true },
+                { "key": "location_id", "value": "", "disabled": true },
+                { "key": "status", "value": "available", "disabled": true },
+                { "key": "page", "value": "1", "disabled": true }
+              ]
+            },
+            "description": "Liste paginée des assets de l'organisation.\n\nFiltres : search, category_id, location_id, status\nPagination : 20 par page, tri par date de création DESC\n\nLe premier asset_id est automatiquement sauvegardé dans `{{asset_id}}`."
+          }
+        },
+        {
+          "name": "Show Asset",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/assets/{{asset_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["assets", "{{asset_id}}"]
+            },
+            "description": "Détail complet d'un asset avec toutes ses relations :\ncategory, location, department, manufacturer, model, supplier, images, tag_values, current_assignment."
+          }
+        },
+        {
+          "name": "Create Asset",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.test('Asset created', function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData).to.have.property('data');",
+                  "        pm.expect(jsonData.data).to.have.property('id');",
+                  "        pm.collectionVariables.set('asset_id', jsonData.data.id);",
+                  "        console.log('Created asset_id saved:', jsonData.data.id);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"MacBook Pro 14\\\"\",\n  \"category_id\": \"REPLACE_WITH_CATEGORY_ID\",\n  \"location_id\": \"REPLACE_WITH_LOCATION_ID\",\n  \"manufacturer_id\": null,\n  \"model_id\": null,\n  \"status\": \"available\",\n  \"notes\": \"Neuf, sous garantie\",\n  \"tag_values\": [\n    {\n      \"asset_tag_id\": \"REPLACE_WITH_TAG_ID\",\n      \"value\": \"FVFXJ3K1Q6LR\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/assets",
+              "host": ["{{base_url}}"],
+              "path": ["assets"]
+            },
+            "description": "Création manuelle d'un asset.\n\nMiddleware : plan.limit:max_assets\n\nChamps requis : name, category_id, location_id\nChamps optionnels : manufacturer_id, model_id, status, purchase_date, purchase_cost, notes, tag_values, image"
+          }
+        },
+        {
+          "name": "Update Asset",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"MacBook Pro 14\\\" - Marie\",\n  \"status\": \"in_use\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/assets/{{asset_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["assets", "{{asset_id}}"]
+            },
+            "description": "Mise à jour d'un asset. Tous les champs sont optionnels.\n\nLes tag_values sont synchronisées (remplace toutes les valeurs existantes)."
+          }
+        },
+        {
+          "name": "Delete Asset",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/assets/{{asset_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["assets", "{{asset_id}}"]
+            },
+            "description": "Suppression douce d'un asset (soft delete)."
+          }
+        },
+        {
+          "name": "AI Extract (multi-image)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var status = pm.response.code;",
+                  "if (status === 200) {",
+                  "    pm.test('AI extraction returned', function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData).to.have.property('recognition_log_id');",
+                  "        pm.expect(jsonData).to.have.property('extraction');",
+                  "        pm.expect(jsonData).to.have.property('resolved_ids');",
+                  "        pm.expect(jsonData).to.have.property('image_paths');",
+                  "        pm.expect(jsonData.image_paths).to.be.an('array');",
+                  "        pm.expect(jsonData).to.have.property('usage');",
+                  "        pm.collectionVariables.set('recognition_log_id', jsonData.recognition_log_id);",
+                  "        console.log('recognition_log_id saved:', jsonData.recognition_log_id);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "photos[]",
+                  "type": "file",
+                  "src": "",
+                  "description": "Photo 1 du produit (JPEG/PNG, max 2048 Ko)"
+                },
+                {
+                  "key": "photos[]",
+                  "type": "file",
+                  "src": "",
+                  "description": "Photo 2 (optionnel, différent angle/étiquette)",
+                  "disabled": true
+                },
+                {
+                  "key": "photos[]",
+                  "type": "file",
+                  "src": "",
+                  "description": "Photo 3 (optionnel)",
+                  "disabled": true
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/assets/ai-extract",
+              "host": ["{{base_url}}"],
+              "path": ["assets", "ai-extract"]
+            },
+            "description": "Extraction d'informations produit par IA à partir d'une ou plusieurs photos (sans créer l'asset).\n\n**Multi-image** : Jusqu'à 5 photos. L'IA combine les informations de toutes les photos (face avant, étiquette, numéro de série...).\n\n**Rétrocompatibilité** : Le champ `photo` (singulier) est aussi accepté pour une seule image.\n\nMiddlewares : throttle:ai-vision, plan.limit:max_ai_requests_daily\n\nRetourne : extraction (nom, catégorie, marque, modèle, serial, SKU), resolved_ids, image_paths (array)."
+          }
+        },
+        {
+          "name": "AI Extract (single photo - rétrocompat)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "photo",
+                  "type": "file",
+                  "src": "",
+                  "description": "Photo unique du produit (JPEG/PNG, max 2048 Ko)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/assets/ai-extract",
+              "host": ["{{base_url}}"],
+              "path": ["assets", "ai-extract"]
+            },
+            "description": "Extraction IA avec une seule photo (rétrocompatibilité).\n\nUtilise le champ `photo` (singulier) au lieu de `photos[]`."
+          }
+        },
+        {
+          "name": "AI Create (multi-image)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.test('Asset created via AI', function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData).to.have.property('data');",
+                  "        pm.expect(jsonData.data).to.have.property('id');",
+                  "        pm.expect(jsonData).to.have.property('extraction');",
+                  "        pm.expect(jsonData).to.have.property('resolved_ids');",
+                  "        pm.expect(jsonData).to.have.property('recognition_log_id');",
+                  "        pm.collectionVariables.set('asset_id', jsonData.data.id);",
+                  "        console.log('AI-created asset_id saved:', jsonData.data.id);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "photos[]",
+                  "type": "file",
+                  "src": "",
+                  "description": "Photo 1 du produit"
+                },
+                {
+                  "key": "photos[]",
+                  "type": "file",
+                  "src": "",
+                  "description": "Photo 2 (optionnel)",
+                  "disabled": true
+                },
+                {
+                  "key": "location_id",
+                  "value": "REPLACE_WITH_LOCATION_ID",
+                  "type": "text",
+                  "description": "Requis. L'IA ne peut pas deviner l'emplacement."
+                },
+                {
+                  "key": "name",
+                  "value": "",
+                  "type": "text",
+                  "description": "Override du nom suggéré par l'IA",
+                  "disabled": true
+                },
+                {
+                  "key": "category_id",
+                  "value": "",
+                  "type": "text",
+                  "description": "Override de la catégorie",
+                  "disabled": true
+                },
+                {
+                  "key": "manufacturer_id",
+                  "value": "",
+                  "type": "text",
+                  "description": "Override du fabricant",
+                  "disabled": true
+                },
+                {
+                  "key": "notes",
+                  "value": "",
+                  "type": "text",
+                  "description": "Override des notes",
+                  "disabled": true
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/assets/ai-create",
+              "host": ["{{base_url}}"],
+              "path": ["assets", "ai-create"]
+            },
+            "description": "Extraction IA + création automatique de l'asset.\n\nL'IA analyse les photos, extrait les informations, résout les IDs, crée l'asset et associe toutes les photos comme AssetImage (première = primary).\n\nOverrides optionnels : name, category_id, manufacturer_id, model_id, notes.\n\nMiddlewares : throttle:ai-vision, plan.limit:max_ai_requests_daily, plan.limit:max_assets"
+          }
+        }
+      ],
+      "description": "CRUD complet sur les assets + création assistée par IA (multi-image).\n\nL'IA analyse jusqu'à 5 photos (différents angles, étiquettes, numéros de série) et combine les informations pour une extraction optimale.\n\nRétrocompatibilité : le champ `photo` (singulier) est toujours supporté pour les endpoints AI."
+    },
+    {
       "name": "Documents",
       "item": [
         {

@@ -158,6 +158,9 @@ class AssetController extends Controller
             ]);
         }
 
+        // Confirm suggested entities (implicit approval)
+        $this->confirmSuggestedEntities($asset);
+
         $asset->load(['category', 'location', 'manufacturer', 'assetModel', 'primaryImage', 'tagValues.tag']);
 
         return response()->json([
@@ -316,11 +319,12 @@ class AssetController extends Controller
             'photos' => 'required_without:photo|array|min:1|max:5',
             'photos.*' => "image|mimes:jpeg,jpg,png|max:{$maxSize}",
             'photo' => "required_without:photos|image|mimes:jpeg,jpg,png|max:{$maxSize}",
-            'location_id' => 'required|string',
+            'location_id' => 'nullable|string',
             'name' => 'nullable|string|max:255',
             'category_id' => 'nullable|string',
             'manufacturer_id' => 'nullable|string',
             'model_id' => 'nullable|string',
+            'supplier_id' => 'nullable|string',
             'notes' => 'nullable|string',
         ]);
 
@@ -384,15 +388,27 @@ class AssetController extends Controller
             $this->validateUniqueTagValues($aiTagValues, $org->id);
         }
 
+        // Resolve location_id: user override > AI resolved > error
+        $locationId = $request->input('location_id') ?? $resolvedIds['location_id'] ?? null;
+        if (! $locationId) {
+            throw ValidationException::withMessages([
+                'location_id' => "Un emplacement est requis. Ni l'utilisateur ni l'IA n'ont pu en déterminer un.",
+            ]);
+        }
+
         // Create asset — user overrides take priority, then AI, then defaults
         $asset = Asset::create([
             'organization_id' => $org->id,
             'name' => $request->input('name') ?? $extraction->suggestedName ?? 'Asset sans nom',
             'category_id' => $request->input('category_id') ?? $resolvedIds['category_id'],
-            'location_id' => $request->input('location_id'),
+            'location_id' => $locationId,
             'manufacturer_id' => $request->input('manufacturer_id') ?? $resolvedIds['manufacturer_id'],
             'model_id' => $request->input('model_id') ?? $resolvedIds['model_id'],
+            'supplier_id' => $request->input('supplier_id') ?? $resolvedIds['supplier_id'] ?? null,
             'status' => 'available',
+            'purchase_cost' => $extraction->purchaseCost,
+            'purchase_date' => $extraction->purchaseDate,
+            'warranty_expiry' => $extraction->warrantyExpiry,
             'notes' => $request->input('notes') ?? $extraction->suggestedDescription,
         ]);
 
@@ -425,6 +441,9 @@ class AssetController extends Controller
                 'selected_asset_id' => $asset->id,
                 'selected_action' => 'created',
             ]);
+
+        // Confirm suggested entities (implicit approval)
+        $this->confirmSuggestedEntities($asset);
 
         $asset->load(['category', 'location', 'manufacturer', 'assetModel', 'primaryImage', 'tagValues.tag']);
         $usage = $this->aiVisionService->getUsageStats($org);
@@ -495,6 +514,19 @@ class AssetController extends Controller
 
         if (! empty($errors)) {
             throw ValidationException::withMessages($errors);
+        }
+    }
+
+    /**
+     * Confirm suggested entities referenced by the asset.
+     */
+    private function confirmSuggestedEntities(Asset $asset): void
+    {
+        foreach (['category', 'manufacturer', 'assetModel', 'location', 'supplier'] as $relation) {
+            $entity = $asset->$relation;
+            if ($entity && $entity->suggested === true) {
+                $entity->update(['suggested' => false]);
+            }
         }
     }
 

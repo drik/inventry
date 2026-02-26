@@ -13,8 +13,10 @@ use App\Models\Asset;
 use App\Models\AssetCategory;
 use App\Models\AssetModel;
 use App\Models\InventoryItem;
+use App\Models\Location;
 use App\Models\Manufacturer;
 use App\Models\Organization;
+use App\Models\Supplier;
 use App\Services\AiVision\VisionProviderInterface;
 use Illuminate\Support\Facades\Storage;
 use Intervention\Image\Laravel\Facades\Image;
@@ -701,22 +703,38 @@ PROMPT;
             ->pluck('name')
             ->toArray();
 
+        $locations = Location::withoutGlobalScopes()
+            ->where('organization_id', $organization->id)
+            ->pluck('name')
+            ->toArray();
+
+        $suppliers = Supplier::withoutGlobalScopes()
+            ->where('organization_id', $organization->id)
+            ->pluck('name')
+            ->toArray();
+
         // Build prompts
         $systemPrompt = $this->getAssetExtractionSystemPrompt();
-        $prompt = $this->buildExtractionPrompt($categories, $manufacturers, count($imagePaths));
+        $prompt = $this->buildExtractionPrompt($categories, $manufacturers, count($imagePaths), $locations, $suppliers);
 
         // Select provider
         $provider = $this->getProvider($organization);
 
         try {
-            $apiResult = $provider->analyze($images, $prompt, ['system' => $systemPrompt]);
+            $apiResult = $provider->analyze($images, $prompt, [
+                'system' => $systemPrompt,
+                'max_tokens' => 8192, // Extraction needs more tokens (invoices, multiple photos)
+            ]);
         } catch (\Exception $e) {
             $plan = $this->planLimitService->getEffectivePlan($organization);
             if ($plan->slug === 'freemium') {
                 throw $e;
             }
             $provider = $this->getFallbackProvider($organization);
-            $apiResult = $provider->analyze($images, $prompt, ['system' => $systemPrompt]);
+            $apiResult = $provider->analyze($images, $prompt, [
+                'system' => $systemPrompt,
+                'max_tokens' => 8192,
+            ]);
             $usedFallback = true;
         }
 
@@ -780,7 +798,7 @@ PROMPT;
     /**
      * Build the extraction prompt with org context.
      */
-    protected function buildExtractionPrompt(array $categories, array $manufacturers, int $imageCount = 1): string
+    protected function buildExtractionPrompt(array $categories, array $manufacturers, int $imageCount = 1, array $locations = [], array $suppliers = []): string
     {
         $categoryList = count($categories) > 0
             ? implode(', ', $categories)
@@ -790,13 +808,23 @@ PROMPT;
             ? implode(', ', $manufacturers)
             : 'Aucun fabricant défini';
 
+        $locationList = count($locations) > 0
+            ? implode(', ', $locations)
+            : 'Aucun emplacement défini';
+
+        $supplierList = count($suppliers) > 0
+            ? implode(', ', $suppliers)
+            : 'Aucun fournisseur défini';
+
         $imageContext = $imageCount > 1
-            ? "Plusieurs photos du même objet sont fournies (différents angles ou détails).\nCombine les informations de toutes les photos pour une extraction la plus complète possible.\n\n"
+            ? "Plusieurs photos du même objet sont fournies (différents angles ou détails). Cela peut inclure des photos du produit, de l'emballage, d'étiquettes, et/ou de factures/reçus.\nCombine les informations de toutes les photos pour une extraction la plus complète possible.\n\n"
             : '';
 
         return <<<PROMPT
 Les catégories d'actifs sont : {$categoryList}
 Les fabricants connus sont : {$manufacturerList}
+Les emplacements connus sont : {$locationList}
+Les fournisseurs connus sont : {$supplierList}
 
 {$imageContext}Analyse les photos et retourne un JSON avec :
 - "suggested_name" : nom descriptif du produit/objet
@@ -805,9 +833,15 @@ Les fabricants connus sont : {$manufacturerList}
 - "suggested_model" : modèle si visible sur le produit
 - "serial_number" : numéro de série si visible
 - "sku" : code SKU/référence produit si visible
-- "detected_text" : tableau de tous les textes détectés sur le produit
+- "detected_text" : tableau des textes importants détectés (numéros de série, références, prix, dates). Maximum 10 éléments, ignorer les textes génériques ou répétitifs
 - "description" : description courte de l'objet pour le champ notes
 - "confidence" : score de confiance global
+- "purchase_cost" : prix d'achat HT ou TTC si visible (nombre décimal, sans devise), null sinon
+- "purchase_date" : date d'achat au format YYYY-MM-DD si visible, null sinon
+- "warranty_duration_months" : durée de garantie en mois si visible, null sinon
+- "warranty_expiry" : date de fin de garantie au format YYYY-MM-DD si visible, null sinon
+- "suggested_location" : emplacement/adresse/lieu mentionné dans le document (parmi les emplacements connus ou suggestion libre), null sinon
+- "suggested_supplier" : nom du vendeur/fournisseur/magasin visible sur la facture (parmi les fournisseurs connus ou suggestion libre), null sinon
 PROMPT;
     }
 
@@ -820,6 +854,8 @@ PROMPT;
             'category_id' => null,
             'manufacturer_id' => null,
             'model_id' => null,
+            'location_id' => null,
+            'supplier_id' => null,
             'unmatched_suggestions' => [],
         ];
 
@@ -828,20 +864,21 @@ PROMPT;
             $category = AssetCategory::withoutGlobalScopes()
                 ->where('organization_id', $org->id)
                 ->where('name', $extraction->suggestedCategory)
-                ->first();
+                ->first()
+                ?? AssetCategory::withoutGlobalScopes()
+                    ->where('organization_id', $org->id)
+                    ->where('name', 'LIKE', '%'.$extraction->suggestedCategory.'%')
+                    ->first();
 
             if (! $category) {
-                $category = AssetCategory::withoutGlobalScopes()
-                    ->where('organization_id', $org->id)
-                    ->where('name', 'LIKE', '%' . $extraction->suggestedCategory . '%')
-                    ->first();
+                $category = AssetCategory::create([
+                    'organization_id' => $org->id,
+                    'name' => $extraction->suggestedCategory,
+                    'suggested' => true,
+                ]);
             }
 
-            if ($category) {
-                $result['category_id'] = $category->id;
-            } else {
-                $result['unmatched_suggestions']['category'] = $extraction->suggestedCategory;
-            }
+            $result['category_id'] = $category->id;
         }
 
         // Resolve manufacturer (org-specific + globals)
@@ -852,23 +889,24 @@ PROMPT;
                         ->orWhere('organization_id', $org->id);
                 })
                 ->where('name', $extraction->suggestedBrand)
-                ->first();
-
-            if (! $manufacturer) {
-                $manufacturer = Manufacturer::withoutGlobalScopes()
+                ->first()
+                ?? Manufacturer::withoutGlobalScopes()
                     ->where(function ($q) use ($org) {
                         $q->whereNull('organization_id')
                             ->orWhere('organization_id', $org->id);
                     })
-                    ->where('name', 'LIKE', '%' . $extraction->suggestedBrand . '%')
+                    ->where('name', 'LIKE', '%'.$extraction->suggestedBrand.'%')
                     ->first();
+
+            if (! $manufacturer) {
+                $manufacturer = Manufacturer::withoutGlobalScopes()->create([
+                    'organization_id' => $org->id,
+                    'name' => $extraction->suggestedBrand,
+                    'suggested' => true,
+                ]);
             }
 
-            if ($manufacturer) {
-                $result['manufacturer_id'] = $manufacturer->id;
-            } else {
-                $result['unmatched_suggestions']['manufacturer'] = $extraction->suggestedBrand;
-            }
+            $result['manufacturer_id'] = $manufacturer->id;
         }
 
         // Resolve model (scoped to matched manufacturer)
@@ -877,21 +915,68 @@ PROMPT;
                 ->where('organization_id', $org->id)
                 ->where('manufacturer_id', $result['manufacturer_id'])
                 ->where('name', $extraction->suggestedModel)
-                ->first();
-
-            if (! $model) {
-                $model = AssetModel::withoutGlobalScopes()
+                ->first()
+                ?? AssetModel::withoutGlobalScopes()
                     ->where('organization_id', $org->id)
                     ->where('manufacturer_id', $result['manufacturer_id'])
-                    ->where('name', 'LIKE', '%' . $extraction->suggestedModel . '%')
+                    ->where('name', 'LIKE', '%'.$extraction->suggestedModel.'%')
                     ->first();
+
+            if (! $model) {
+                $model = AssetModel::create([
+                    'organization_id' => $org->id,
+                    'name' => $extraction->suggestedModel,
+                    'manufacturer_id' => $result['manufacturer_id'],
+                    'category_id' => $result['category_id'],
+                    'suggested' => true,
+                ]);
             }
 
-            if ($model) {
-                $result['model_id'] = $model->id;
-            } else {
-                $result['unmatched_suggestions']['model'] = $extraction->suggestedModel;
+            $result['model_id'] = $model->id;
+        }
+
+        // Resolve location
+        if ($extraction->suggestedLocation) {
+            $location = Location::withoutGlobalScopes()
+                ->where('organization_id', $org->id)
+                ->where('name', $extraction->suggestedLocation)
+                ->first()
+                ?? Location::withoutGlobalScopes()
+                    ->where('organization_id', $org->id)
+                    ->where('name', 'LIKE', '%'.$extraction->suggestedLocation.'%')
+                    ->first();
+
+            if (! $location) {
+                $location = Location::create([
+                    'organization_id' => $org->id,
+                    'name' => $extraction->suggestedLocation,
+                    'suggested' => true,
+                ]);
             }
+
+            $result['location_id'] = $location->id;
+        }
+
+        // Resolve supplier
+        if ($extraction->suggestedSupplier) {
+            $supplier = Supplier::withoutGlobalScopes()
+                ->where('organization_id', $org->id)
+                ->where('name', $extraction->suggestedSupplier)
+                ->first()
+                ?? Supplier::withoutGlobalScopes()
+                    ->where('organization_id', $org->id)
+                    ->where('name', 'LIKE', '%'.$extraction->suggestedSupplier.'%')
+                    ->first();
+
+            if (! $supplier) {
+                $supplier = Supplier::create([
+                    'organization_id' => $org->id,
+                    'name' => $extraction->suggestedSupplier,
+                    'suggested' => true,
+                ]);
+            }
+
+            $result['supplier_id'] = $supplier->id;
         }
 
         return $result;

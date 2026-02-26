@@ -25,12 +25,14 @@ class Location extends Model
         'coordinates',
         'contact_person',
         'contact_phone',
+        'suggested',
     ];
 
     protected function casts(): array
     {
         return [
             'coordinates' => 'array',
+            'suggested' => 'boolean',
         ];
     }
 

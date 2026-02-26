@@ -9,7 +9,7 @@ class OpenAiVisionProvider implements VisionProviderInterface
     public function analyze(array $images, string $prompt, array $options = []): array
     {
         $model = config('ai-vision.openai.model', 'gpt-4o');
-        $maxTokens = config('ai-vision.openai.max_tokens', 1000);
+        $maxTokens = $options['max_tokens'] ?? config('ai-vision.openai.max_tokens', 4096);
 
         $messages = [];
 

@@ -42,6 +42,21 @@ class AssetCategoryResource extends Resource
                     ->searchable()
                     ->sortable(),
 
+                Tables\Columns\IconColumn::make('suggested')
+                    ->label('IA')
+                    ->icon(fn ($state): ?string => match ($state) {
+                        true => 'heroicon-o-sparkles',
+                        false => 'heroicon-o-check-circle',
+                        default => null,
+                    })
+                    ->color(fn ($state): ?string => match ($state) {
+                        true => 'warning',
+                        false => 'success',
+                        default => null,
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->sortable(),
+
                 Tables\Columns\TextColumn::make('organization.name')
                     ->label('Organisation')
                     ->sortable()
@@ -88,6 +103,12 @@ class AssetCategoryResource extends Resource
                     ->relationship('organization', 'name')
                     ->searchable()
                     ->preload(),
+
+                Tables\Filters\TernaryFilter::make('suggested')
+                    ->label('Suggestion IA')
+                    ->trueLabel('Non confirmées')
+                    ->falseLabel('Confirmées')
+                    ->placeholder('Toutes'),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),

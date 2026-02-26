@@ -23,12 +23,14 @@ class AssetModel extends Model
         'image_path',
         'end_of_life_months',
         'notes',
+        'suggested',
     ];
 
     protected function casts(): array
     {
         return [
             'end_of_life_months' => 'integer',
+            'suggested' => 'boolean',
         ];
     }
 

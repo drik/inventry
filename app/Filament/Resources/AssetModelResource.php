@@ -44,6 +44,21 @@ class AssetModelResource extends Resource
                     ->searchable()
                     ->sortable(),
 
+                Tables\Columns\IconColumn::make('suggested')
+                    ->label('IA')
+                    ->icon(fn ($state): ?string => match ($state) {
+                        true => 'heroicon-o-sparkles',
+                        false => 'heroicon-o-check-circle',
+                        default => null,
+                    })
+                    ->color(fn ($state): ?string => match ($state) {
+                        true => 'warning',
+                        false => 'success',
+                        default => null,
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->sortable(),
+
                 Tables\Columns\TextColumn::make('model_number')
                     ->label('N° modèle')
                     ->searchable()
@@ -90,6 +105,12 @@ class AssetModelResource extends Resource
                 Tables\Filters\SelectFilter::make('manufacturer_id')
                     ->relationship('manufacturer', 'name')
                     ->label('Fabricant'),
+
+                Tables\Filters\TernaryFilter::make('suggested')
+                    ->label('Suggestion IA')
+                    ->trueLabel('Non confirmées')
+                    ->falseLabel('Confirmées')
+                    ->placeholder('Toutes'),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),

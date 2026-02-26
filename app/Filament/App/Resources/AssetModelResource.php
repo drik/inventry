@@ -24,9 +24,9 @@ class AssetModelResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
-    protected static ?string $modelLabel = 'Model';
+    protected static ?string $modelLabel = 'Asset Model';
 
-    protected static ?string $pluralModelLabel = 'Models';
+    protected static ?string $pluralModelLabel = 'Asset Models';
 
     public static function form(Form $form): Form
     {
@@ -85,6 +85,21 @@ class AssetModelResource extends Resource
                     ->searchable()
                     ->sortable(),
 
+                Tables\Columns\IconColumn::make('suggested')
+                    ->label('IA')
+                    ->icon(fn ($state): ?string => match ($state) {
+                        true => 'heroicon-o-sparkles',
+                        false => 'heroicon-o-check-circle',
+                        default => null,
+                    })
+                    ->color(fn ($state): ?string => match ($state) {
+                        true => 'warning',
+                        false => 'success',
+                        default => null,
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->sortable(),
+
                 Tables\Columns\TextColumn::make('model_number')
                     ->searchable()
                     ->toggleable(),
@@ -116,6 +131,11 @@ class AssetModelResource extends Resource
                 Tables\Filters\SelectFilter::make('manufacturer_id')
                     ->relationship('manufacturer', 'name')
                     ->label('Manufacturer'),
+                Tables\Filters\TernaryFilter::make('suggested')
+                    ->label('Suggestion IA')
+                    ->trueLabel('Non confirmées')
+                    ->falseLabel('Confirmées')
+                    ->placeholder('Toutes'),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),

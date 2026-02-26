@@ -26,6 +26,7 @@ class AssetCategory extends Model
         'depreciation_method',
         'default_useful_life_months',
         'sort_order',
+        'suggested',
     ];
 
     protected function casts(): array
@@ -33,6 +34,7 @@ class AssetCategory extends Model
         return [
             'custom_fields_schema' => 'array',
             'depreciation_method' => DepreciationMethod::class,
+            'suggested' => 'boolean',
         ];
     }
 

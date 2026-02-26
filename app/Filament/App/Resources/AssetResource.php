@@ -13,7 +13,6 @@ use App\Models\AssetCategory;
 use App\Models\AssetTag;
 use App\Models\AssetTagValue;
 use Filament\Facades\Filament;
-use Illuminate\Database\Eloquent\Model;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Infolists;
@@ -51,6 +50,11 @@ class AssetResource extends Resource
 
                                         Forms\Components\Select::make('category_id')
                                             ->relationship('category', 'name')
+                                            ->getOptionLabelFromRecordUsing(
+                                                fn ($record) => $record->suggested
+                                                    ? "{$record->name} (Suggestion IA)"
+                                                    : $record->name
+                                            )
                                             ->required()
                                             ->searchable()
                                             ->preload()
@@ -79,6 +83,11 @@ class AssetResource extends Resource
 
                                         Forms\Components\Select::make('location_id')
                                             ->relationship('location', 'name')
+                                            ->getOptionLabelFromRecordUsing(
+                                                fn ($record) => $record->suggested
+                                                    ? "{$record->name} (Suggestion IA)"
+                                                    : $record->name
+                                            )
                                             ->required()
                                             ->searchable()
                                             ->preload(),
@@ -91,6 +100,11 @@ class AssetResource extends Resource
 
                                         Forms\Components\Select::make('manufacturer_id')
                                             ->relationship('manufacturer', 'name')
+                                            ->getOptionLabelFromRecordUsing(
+                                                fn ($record) => $record->suggested
+                                                    ? "{$record->name} (Suggestion IA)"
+                                                    : $record->name
+                                            )
                                             ->searchable()
                                             ->preload()
                                             ->nullable(),
@@ -98,6 +112,11 @@ class AssetResource extends Resource
                                         Forms\Components\Select::make('model_id')
                                             ->label('Model')
                                             ->relationship('assetModel', 'name')
+                                            ->getOptionLabelFromRecordUsing(
+                                                fn ($record) => $record->suggested
+                                                    ? "{$record->name} (Suggestion IA)"
+                                                    : $record->name
+                                            )
                                             ->searchable()
                                             ->preload()
                                             ->nullable(),
@@ -105,6 +124,11 @@ class AssetResource extends Resource
                                         Forms\Components\Select::make('supplier_id')
                                             ->label('Supplier')
                                             ->relationship('supplier', 'name')
+                                            ->getOptionLabelFromRecordUsing(
+                                                fn ($record) => $record->suggested
+                                                    ? "{$record->name} (Suggestion IA)"
+                                                    : $record->name
+                                            )
                                             ->searchable()
                                             ->preload()
                                             ->nullable(),
@@ -153,34 +177,48 @@ class AssetResource extends Resource
                                                     ->helperText(fn (Forms\Get $get): ?string => AssetTag::find($get('asset_tag_id'))?->description)
                                                     ->maxLength(255)
                                                     ->live(debounce: 500)
-                                                    ->rules([
-                                                        fn (Forms\Get $get, ?Model $record): \Closure => function (string $attribute, $value, \Closure $fail) use ($get, $record) {
-                                                            if (empty($value)) {
-                                                                return;
-                                                            }
+                                                    ->afterStateUpdated(function (?string $state, Forms\Get $get, $component, $livewire) {
+                                                        $statePath = $component->getStatePath();
+                                                        $livewire->resetErrorBag($statePath);
 
-                                                            $tagId = $get('asset_tag_id');
-                                                            $tag = AssetTag::find($tagId);
+                                                        if (empty($state)) {
+                                                            return;
+                                                        }
 
-                                                            if (! $tag || ! $tag->is_unique) {
-                                                                return;
-                                                            }
+                                                        // Resolve asset_tag_id: try $get first, then navigate Livewire data
+                                                        $tagId = $get('asset_tag_id');
 
-                                                            $orgId = Filament::getTenant()?->id;
-                                                            $query = AssetTagValue::where('organization_id', $orgId)
-                                                                ->where('asset_tag_id', $tagId)
-                                                                ->where('value', $value);
+                                                        if (empty($tagId)) {
+                                                            // statePath is like "data.tagValues.UUID.value"
+                                                            // Replace ".value" with ".asset_tag_id" to find the sibling
+                                                            $tagIdPath = preg_replace('/\.value$/', '.asset_tag_id', $statePath);
+                                                            $tagId = data_get($livewire->data, str_replace('data.', '', $tagIdPath));
+                                                        }
 
-                                                            // Exclude current asset when editing ($record is AssetTagValue here)
-                                                            if ($record instanceof AssetTagValue && $record->asset_id) {
-                                                                $query->where('asset_id', '!=', $record->asset_id);
-                                                            }
+                                                        if (empty($tagId)) {
+                                                            return;
+                                                        }
 
-                                                            if ($query->exists()) {
-                                                                $fail("La valeur \"{$value}\" existe déjà pour le tag \"{$tag->name}\". Les valeurs de ce tag doivent être uniques.");
-                                                            }
-                                                        },
-                                                    ])
+                                                        $tag = AssetTag::find($tagId);
+
+                                                        if (! $tag || ! $tag->is_unique) {
+                                                            return;
+                                                        }
+
+                                                        $orgId = Filament::getTenant()?->id;
+                                                        $query = AssetTagValue::where('organization_id', $orgId)
+                                                            ->where('asset_tag_id', $tagId)
+                                                            ->where('value', $state);
+
+                                                        $currentAssetId = $livewire->getRecord()?->getKey();
+                                                        if ($currentAssetId) {
+                                                            $query->where('asset_id', '!=', $currentAssetId);
+                                                        }
+
+                                                        if ($query->exists()) {
+                                                            $livewire->addError($statePath, "La valeur \"{$state}\" existe déjà pour le tag \"{$tag->name}\". Les valeurs de ce tag doivent être uniques.");
+                                                        }
+                                                    })
                                                     ->suffixAction(
                                                         Forms\Components\Actions\Action::make('scan')
                                                             ->icon('heroicon-o-qr-code')

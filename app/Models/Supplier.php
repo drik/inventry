@@ -24,7 +24,15 @@ class Supplier extends Model
         'email',
         'url',
         'notes',
+        'suggested',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'suggested' => 'boolean',
+        ];
+    }
 
     public function assets(): HasMany
     {

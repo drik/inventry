@@ -66,6 +66,21 @@ class ManufacturerResource extends Resource
                     ->sortable()
                     ->description(fn ($record) => $record->isDefault() ? 'Default' : null),
 
+                Tables\Columns\IconColumn::make('suggested')
+                    ->label('IA')
+                    ->icon(fn ($state): ?string => match ($state) {
+                        true => 'heroicon-o-sparkles',
+                        false => 'heroicon-o-check-circle',
+                        default => null,
+                    })
+                    ->color(fn ($state): ?string => match ($state) {
+                        true => 'warning',
+                        false => 'success',
+                        default => null,
+                    })
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->sortable(),
+
                 Tables\Columns\TextColumn::make('website')
                     ->url(fn ($record) => $record->website, shouldOpenInNewTab: true)
                     ->toggleable(),
@@ -73,7 +88,13 @@ class ManufacturerResource extends Resource
                 Tables\Columns\TextColumn::make('support_email')
                     ->toggleable(),
             ])
-            ->filters([])
+            ->filters([
+                Tables\Filters\TernaryFilter::make('suggested')
+                    ->label('Suggestion IA')
+                    ->trueLabel('Non confirmées')
+                    ->falseLabel('Confirmées')
+                    ->placeholder('Toutes'),
+            ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make()

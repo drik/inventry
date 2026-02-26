@@ -20,7 +20,15 @@ class Manufacturer extends Model
         'support_email',
         'support_phone',
         'notes',
+        'suggested',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'suggested' => 'boolean',
+        ];
+    }
 
     protected static function booted(): void
     {

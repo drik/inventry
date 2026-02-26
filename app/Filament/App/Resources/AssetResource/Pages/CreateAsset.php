@@ -4,6 +4,8 @@ namespace App\Filament\App\Resources\AssetResource\Pages;
 
 use App\Enums\PlanFeature;
 use App\Filament\App\Resources\AssetResource;
+use App\Filament\App\Resources\AssetResource\Concerns\ConfirmsSuggestedEntities;
+use App\Filament\App\Resources\AssetResource\Concerns\ValidatesUniqueTagValues;
 use App\Filament\Concerns\ChecksPlanLimits;
 use App\Models\AiRecognitionLog;
 use App\Models\AssetCategory;
@@ -19,7 +21,7 @@ use Illuminate\Support\Facades\Storage;
 
 class CreateAsset extends CreateRecord
 {
-    use ChecksPlanLimits;
+    use ChecksPlanLimits, ConfirmsSuggestedEntities, ValidatesUniqueTagValues;
 
     protected static string $resource = AssetResource::class;
 
@@ -137,6 +139,27 @@ class CreateAsset extends CreateRecord
             $formData['model_id'] = $resolvedIds['model_id'];
         }
 
+        // Location (resolved or suggested)
+        if (! empty($resolvedIds['location_id'])) {
+            $formData['location_id'] = $resolvedIds['location_id'];
+        }
+
+        // Supplier (resolved or suggested)
+        if (! empty($resolvedIds['supplier_id'])) {
+            $formData['supplier_id'] = $resolvedIds['supplier_id'];
+        }
+
+        // Financial fields
+        if (! empty($extraction['purchase_cost'])) {
+            $formData['purchase_cost'] = $extraction['purchase_cost'];
+        }
+        if (! empty($extraction['purchase_date'])) {
+            $formData['purchase_date'] = $extraction['purchase_date'];
+        }
+        if (! empty($extraction['warranty_expiry'])) {
+            $formData['warranty_expiry'] = $extraction['warranty_expiry'];
+        }
+
         // Build notes from AI extraction
         $notes = '';
         if (! empty($extraction['description'])) {
@@ -183,9 +206,17 @@ class CreateAsset extends CreateRecord
         $this->form->fill($formData);
     }
 
+    protected function beforeCreate(): void
+    {
+        $this->validateUniqueTagValues();
+    }
+
     protected function afterCreate(): void
     {
         $record = $this->record;
+
+        // Confirm suggested entities (implicit approval)
+        $this->confirmSuggestedEntities($record);
 
         // If this asset was created via AI photos, save them as images
         if ($this->aiImagePaths) {

@@ -79,6 +79,30 @@ Route::middleware('auth:sanctum')->group(function () {
         return response()->json(['data' => $categories]);
     });
 
+    Route::get('/categories/{categoryId}/tags', function (Request $request, string $categoryId) {
+        $org = $request->user()->organization;
+
+        $category = AssetCategory::withoutGlobalScopes()
+            ->where('organization_id', $org->id)
+            ->findOrFail($categoryId);
+
+        $tags = AssetCategory::getAllTagsForCategory($categoryId, $org->id);
+
+        return response()->json([
+            'data' => $tags->map(fn ($tag) => [
+                'id' => $tag->id,
+                'name' => $tag->name,
+                'description' => $tag->description,
+                'is_required' => (bool) $tag->is_required,
+                'encoding_mode' => $tag->encoding_mode?->value ?? null,
+                'sort_order' => $tag->sort_order,
+                'is_system' => (bool) $tag->is_system,
+                'is_unique' => (bool) $tag->is_unique,
+                'category_id' => $tag->category_id,
+            ]),
+        ]);
+    });
+
     Route::get('/locations', function (Request $request) {
         $org = $request->user()->organization;
         $locations = Location::withoutGlobalScopes()

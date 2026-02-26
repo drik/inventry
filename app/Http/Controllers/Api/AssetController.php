@@ -220,10 +220,14 @@ class AssetController extends Controller
             }
         }
 
-        $asset->load(['category', 'location', 'manufacturer', 'assetModel', 'primaryImage', 'tagValues.tag']);
+        $asset->load([
+            'category', 'location', 'department', 'manufacturer',
+            'assetModel', 'supplier', 'images', 'tagValues.tag',
+            'currentAssignment.assignee',
+        ]);
 
         return response()->json([
-            'data' => $this->formatAsset($asset),
+            'data' => $this->formatAssetDetailed($asset),
         ]);
     }
 
